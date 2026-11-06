@@ -1,0 +1,17 @@
+# Environnement virtuel et caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Secrets : jamais versionnés (seul .env.example l'est)
+.env
+.env.*
+!.env.example
+
+# Fichiers générés
+*.dump
+*.sql.gz
+htmlcov/
+.coverage
