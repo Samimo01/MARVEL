@@ -9,8 +9,8 @@ export default function ProfilePage() {
   return (
     <div>
       <PageMeta
-        title="React.js Profile Dashboard | TailAdmin - React.js Admin Dashboard Template"
-        description="This is React.js Profile Dashboard page for TailAdmin - React.js Tailwind CSS Admin Dashboard Template"
+        title="Profil"
+        description="Gestion des informations du compte administrateur."
       />
       <PageBreadcrumb pageTitle="Profile" />
       <div className="rounded-2xl border border-gray-200 bg-white p-5 lg:p-6 dark:border-gray-800 dark:bg-white/3">
