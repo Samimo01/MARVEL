@@ -9,7 +9,12 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 from app.config import settings
 
 # Le moteur ne se connecte qu'à la première requête : l'import ne nécessite pas la base.
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    connect_args={"prepare_threshold": None},
+)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False)
 
 
