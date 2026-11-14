@@ -32,13 +32,12 @@ def login(payload: LoginRequest) -> TokenResponse:
 )
 def register(payload: RegistrationRequest, db: DbSession) -> RegistrationResponse:
     try:
-        user = service.register_user(db, payload)
+        user, access_token = service.register_user(db, payload)
     except DuplicateAccountError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return RegistrationResponse(
         message="Compte créé.",
         id_user=user.id_user,
         nickname=user.nickname,
+        access_token=access_token,
     )

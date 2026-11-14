@@ -36,6 +36,8 @@ class RegistrationResponse(BaseModel):
     message: str
     id_user: UUID
     nickname: str | None = None
+    access_token: str
+    token_type: str = "bearer"
 
 
 class LoginRequest(BaseModel):

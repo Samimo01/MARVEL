@@ -1,4 +1,3 @@
-"""Routeur principal de l'API v1 : agrège la santé, les routes publiques et les modules."""
 
 from fastapi import APIRouter
 

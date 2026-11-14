@@ -78,10 +78,12 @@ En production, mettre ici les domaines réels.
 
 ## Création de compte
 
-`POST /api/v1/auth/register` crée un compte à partir du prénom, du nom, de l'e-mail et
-du mot de passe (pseudonyme et téléphone facultatifs). Aucun rôle n'est attribué à
-l'inscription ; les rôles sont gérés séparément par un administrateur. La création ne
-dépend pas de la configuration d'un service d'e-mail.
+`POST /api/v1/auth/register` crée un compte à partir du prénom, du nom, de l'e-mail,
+du mot de passe et du téléphone, puis renvoie un token d'accès JWT de type Bearer.
+La clé `JWT_SECRET_KEY` doit contenir au moins 32 octets et être définie dans `.env`
+(génération : `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
+Aucun rôle n'est attribué à l'inscription ; les rôles sont gérés séparément par un
+administrateur. La création ne dépend pas de la configuration d'un service d'e-mail.
 
 ## Base de données (Alembic)
 
