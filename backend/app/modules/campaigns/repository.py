@@ -1,14 +1,19 @@
-"""Accès aux données du module campaigns. Pas de commit ici."""
+"""Accès aux données du module campaigns."""
 
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from datetime import datetime
-# Correction des imports
+
 from app.modules.campaigns.models import Campaign
 #from app.modules.donations.models import FinancialDon 
 
+
+# ============================================================
+# LECTURE
+# ============================================================
 def get_campaign_by_id(session: Session, id_campaign: UUID) -> Campaign | None:
     return session.get(Campaign, id_campaign)
 
@@ -16,9 +21,13 @@ def get_campaign_by_title(session: Session, title: str) -> Campaign | None:
     return session.scalar(select(Campaign).where(func.lower(Campaign.title) == title.lower()))
 
 def get_published_campaign_by_id(session: Session, id_campaign: UUID) -> Campaign | None:
-    return session.scalar(select(Campaign).where(Campaign.id_campaign == id_campaign, Campaign.status != "Draft"))
+    return session.scalar(select(Campaign).where(
+        Campaign.id_campaign == id_campaign, 
+        Campaign.status != "Draft"
+    ))
 
 def list_active_campaigns(session: Session, *, limit: int = 50, offset: int = 0) -> list[Campaign]:
+    """CAT-01 : Campagnes en cours."""
     stmt = (
         select(Campaign).where(Campaign.status == "In_progress")
         .order_by(Campaign.start_at.asc().nulls_last(), Campaign.created_at.desc())
@@ -26,50 +35,14 @@ def list_active_campaigns(session: Session, *, limit: int = 50, offset: int = 0)
     )
     return list(session.scalars(stmt).all())
 
-def add_campaign(session: Session, campaign: Campaign) -> None:
-    session.add(campaign)
-    session.flush()
-
-def update_campaign(session: Session, campaign: Campaign, data: dict) -> Campaign:
-    for field, value in data.items():
-        setattr(campaign, field, value)
-    session.flush()
-    return campaign
-
-def publish_campaign(session: Session, campaign: Campaign) -> Campaign:
-    if campaign.status != "closed":
-        campaign.status = "In_progress"
-        session.flush()
-    return campaign
-
-def unpublish_campaign(session: Session, campaign: Campaign) -> Campaign:
-    if campaign.status == "In_progress":
-        campaign.status = "Draft"
-        session.flush()
-    return campaign
-
-def delete_campaign(session: Session, campaign: Campaign) -> None:
-    session.delete(campaign)
-    session.flush()
-
-#def get_campaign_amount_collected(session: Session, id_campaign: UUID) -> Decimal:
- #   total = session.scalar(
-  #      select(func.coalesce(func.sum(FinancialDon.amount), 0)).where(
-   #         FinancialDon.id_campaign == id_campaign, FinancialDon.status == "Success"
-    #    )
-    #)
-    #return Decimal(total or 0)
-
-#def get_campaigns_amounts_collected(session: Session, ids: list[UUID]) -> dict[UUID, Decimal]:
- #   if not ids: return {}
-  #  rows = session.execute(
-   #     select(FinancialDon.id_campaign, func.coalesce(func.sum(FinancialDon.amount), 0))
-    #    .where(FinancialDon.id_campaign.in_(ids), FinancialDon.status == "Success")
-     #   .group_by(FinancialDon.id_campaign)
-    #).all()
-    #return {row[0]: Decimal(row[1]) for row in rows}
-
-# ... (vos fonctions existantes)
+def list_closed_campaigns(session: Session, *, limit: int = 50, offset: int = 0) -> list[Campaign]:
+    """CAM-07 : Campagnes clôturées."""
+    stmt = (
+        select(Campaign).where(Campaign.status == "closed")
+        .order_by(Campaign.closed_at.desc().nulls_last())
+        .limit(limit).offset(offset)
+    )
+    return list(session.scalars(stmt).all())
 
 def list_filtered_campaigns(
     session: Session, 
@@ -80,6 +53,7 @@ def list_filtered_campaigns(
     limit: int = 50, 
     offset: int = 0
 ) -> list[Campaign]:
+    """CAM-09 : Toutes les campagnes (avec filtres)."""
     stmt = select(Campaign)
     
     if status:
@@ -92,24 +66,94 @@ def list_filtered_campaigns(
     stmt = stmt.order_by(Campaign.created_at.desc()).limit(limit).offset(offset)
     return list(session.scalars(stmt).all())
 
+def list_user_drafts(session: Session, id_user: UUID) -> list[Campaign]:
+    """CAM-08 : Brouillons d'un utilisateur spécifique."""
+    return list(session.scalars(
+        select(Campaign).where(
+            Campaign.id_user == id_user, 
+            Campaign.status == "Draft"
+        ).order_by(Campaign.created_at.desc())
+    ).all())
+
+def list_user_invisible_campaigns(session: Session, id_user: UUID) -> list[Campaign]:
+    """CAM-10 : Campagnes désactivées (invisibles) d'un utilisateur spécifique."""
+    # Dans notre logique, une campagne désactivée (CAT-09) repasse en "Draft"
+    return list(session.scalars(
+        select(Campaign).where(
+            Campaign.id_user == id_user, 
+            Campaign.status == "Draft"
+        ).order_by(Campaign.created_at.desc())
+    ).all())
+
+
+# ============================================================
+# ÉCRITURE
+# ============================================================
+def add_campaign(session: Session, campaign: Campaign) -> None:
+    session.add(campaign)
+    session.flush()
+
+def update_campaign(session: Session, campaign: Campaign, data: dict) -> Campaign:
+    for field, value in data.items():
+        setattr(campaign, field, value)
+    session.flush()
+    return campaign
+
+def publish_campaign(session: Session, campaign: Campaign) -> Campaign:
+    """Passe le statut à In_progress."""
+    campaign.status = "In_progress"
+    session.flush()
+    return campaign
+
+def deactivate_campaign(session: Session, campaign: Campaign) -> Campaign:
+    """Repasse une campagne en brouillon (invisible)."""
+    campaign.status = "Draft"
+    session.flush()
+    return campaign
+
 def close_campaign(session: Session, campaign: Campaign, reason: str | None = None) -> Campaign:
+    """Passe le statut à closed."""
     campaign.status = "closed"
     if reason:
         campaign.closure_reason = reason
     session.flush()
     return campaign
 
-#def get_donations_by_campaign(session: Session, id_campaign: UUID) -> list[FinancialDon]:
-    # Assurez-vous que l'import from app.modules.donations.models import FinancialDon est actif
- #   return list(session.scalars(
-  #      select(FinancialDon).where(FinancialDon.id_campaign == id_campaign)
-   # ).all())
+def delete_campaign(session: Session, campaign: Campaign) -> None:
+    session.delete(campaign)
+    session.flush()
 
+
+# ============================================================
+# AGRÉGATS & DONS
+# ============================================================
 #def get_campaign_amount_collected(session: Session, id_campaign: UUID) -> Decimal:
- #   total = session.scalar(
-  #      select(func.coalesce(func.sum(FinancialDon.amount), 0)).where(
-   #         FinancialDon.id_campaign == id_campaign, 
-    #        FinancialDon.status == "Success"
-     #   )
+ #   """Calcule la somme des dons réussis pour une campagne."""
+  #  total = session.scalar(
+   #     select(func.coalesce(func.sum(FinancialDon.amount), 0)).where(
+    #        FinancialDon.id_campaign == id_campaign, 
+     #       FinancialDon.status == "Success"
+      #  )
     #)
-    #return Decimal(total orz 0)
+    #return Decimal(total or 0)
+
+#def get_campaigns_amounts_collected(session: Session, ids: list[UUID]) -> dict[UUID, Decimal]:
+ #   """Batch pour éviter le N+1."""
+  #  if not ids: 
+   #     return {}
+    #rows = session.execute(
+     #   select(FinancialDon.id_campaign, func.coalesce(func.sum(FinancialDon.amount), 0))
+      #  .where(
+       #     FinancialDon.id_campaign.in_(ids), 
+        #    FinancialDon.status == "Success"
+  #      )
+   #     .group_by(FinancialDon.id_campaign)
+    #).all()
+    #return {row[0]: Decimal(row[1]) for row in rows}
+
+#def get_donations_by_campaign(session: Session, id_campaign: UUID) -> list[FinancialDon]:
+ #   """Récupère la liste des dons d'une campagne."""
+  #  return list(session.scalars(
+   #     select(FinancialDon).where(FinancialDon.id_campaign == id_campaign)
+    #    .order_by(FinancialDon.created_at.desc())
+    #).all())

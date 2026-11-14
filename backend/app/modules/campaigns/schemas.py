@@ -26,7 +26,6 @@ class CampaignBase(BaseModel):
 class CampaignCreate(CampaignBase):
     """CAT-07 — POST /campaigns."""
 
-
 class CampaignUpdate(BaseModel):
     """CAT-08 — PUT /campaigns/{id}. Tous optionnels."""
 
@@ -38,13 +37,6 @@ class CampaignUpdate(BaseModel):
     categories: list[str] | None = None
     image_url: str | None = None
     closure_reason: str | None = None
-
-
-class PublicationIn(BaseModel):
-    """CAT-09 — PATCH /campaigns/{id}/publication."""
-
-    est_publier: bool
-    date_publication: datetime | None = None  # accepté mais ignoré
 
 
 # ============================================================
@@ -63,7 +55,6 @@ class CampaignOut(CampaignBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# 👇 AJOUTEZ CETTE CLASSE MANQUANTE 👇
 class CampaignPublic(BaseModel):
     """Schéma public de base pour une campagne."""
     id_campaign: UUID
@@ -79,19 +70,23 @@ class CampaignPublic(BaseModel):
 
 
 class CampaignProgressOut(CampaignPublic):
-    """campagne publique avec jauge (hérite de CampaignPublic)."""
+    """Campagne publique avec jauge."""
     progress_percent: float = Field(0.0, ge=0, le=100)
 
-class JaugeOut(BaseModel):
+
+class GaugeOut(BaseModel):
+    """CAM-05 : Jauge de progression."""
     id_campaign: UUID
-    objectif: Decimal | None
-    collecte: Decimal
-    pourcentage: float
+    goal: Decimal | None
+    collected: Decimal
+    percentage: float
+
 
 #class FinancialDonOut(BaseModel):
- #   id_don_f: UUID
-  #  amount: Decimal
-   # status: str
+ #   """CAM-06 : Dons rattachés à une campagne."""
+  #  id_don_f: UUID
+   # amount: Decimal
+    #status: str
     #created_at: datetime
     #is_anonymous: bool
     
