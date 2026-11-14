@@ -1,9 +1,8 @@
 """Endpoints HTTP du module campaigns."""
 
-from datetime import datetime
+
 from datetime import datetime
 from uuid import UUID
-
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -11,15 +10,12 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user, require_campaign_editor
 from app.database import get_db
 from app.modules.auth.models import User
-from app.modules.campaigns import repository as campaign_repo
 from app.modules.campaigns import service as campaign_service
 from app.modules.campaigns.schemas import (
     CampaignCreate,
     CampaignOut,
     CampaignProgressOut,
     CampaignUpdate,
-    GaugeOut,
-    PublicationIn,
     # FinancialDonOut,
     CampaignCreate, CampaignOut, CampaignProgressOut, CampaignUpdate,
     GaugeOut#, FinancialDonOut
@@ -27,7 +23,7 @@ from app.modules.campaigns.schemas import (
 from app.modules.campaigns.service import (
     CampaignNotFoundError,
     CampaignTitleAlreadyExistsError,
-    CannotPublishClosedCampaignError,
+    InvalidStatusTransitionError,
     CampaignNotFoundError, CampaignTitleAlreadyExistsError, InvalidStatusTransitionError
 )
 
@@ -35,7 +31,7 @@ from app.modules.campaigns.service import (
 # Déclaration des routers
 # ============================================================
 # Routes publiques (catalog en français)
-catalog_router = APIRouter(prefix="/catalog/campagnes", tags=["catalog"])
+campaign_catalog_router = APIRouter(prefix="/catalog/campagnes", tags=["catalog"])
 
 # Routes privées (Gestion en anglais)
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
@@ -45,7 +41,7 @@ router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 # ROUTES PUBLIQUES (CAT-01, CAT-02, CAM-07)
 # ============================================================
 
-@catalog_router.get("", response_model=list[CampaignProgressOut])
+@campaign_catalog_router.get("", response_model=list[CampaignProgressOut])
 def cat01_list_active_campaigns(
     session: Session = Depends(get_db),
     limit: int = 50,
@@ -54,7 +50,7 @@ def cat01_list_active_campaigns(
     """CAT-01 : Campagnes en cours avec jauge."""
     return campaign_service.list_active_campaigns(session, limit=limit, offset=offset)
 
-@catalog_router.get("/closed", response_model=list[CampaignProgressOut])
+@campaign_catalog_router.get("/closed", response_model=list[CampaignProgressOut])
 def cam07_list_closed_campaigns(
     session: Session = Depends(get_db),
     limit: int = 50,
@@ -63,7 +59,7 @@ def cam07_list_closed_campaigns(
     """CAM-07 : Campagnes fermées avec jauge."""
     return campaign_service.list_closed_campaigns(session, limit=limit, offset=offset)
 
-@catalog_router.get("/{id_campaign}", response_model=CampaignProgressOut)
+@campaign_catalog_router.get("/{id_campaign}", response_model=CampaignProgressOut)
 def cat02_campaign_detail(
     id_campaign: UUID,
     session: Session = Depends(get_db),
