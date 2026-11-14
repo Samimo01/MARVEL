@@ -1,4 +1,4 @@
-# TailAdmin cleanup notes
+# MARVEL frontend cleanup notes
 
 ## Phase 1: demo-page cleanup
 
@@ -34,3 +34,13 @@
 ## Validation
 
 `npm run build` could not be completed in the provided environment because `npm ci` did not finish before the execution timeout. The partial dependency installation also left TypeScript unable to resolve the Vite and Node type definitions. Re-run `npm ci` in the project environment, then `npm run build`.
+
+
+## Phase 2 — Architectural restructuring
+
+- Migration of the admin layout to `src/layouts/admin-layout/`.
+- Migration of the dashboard, profile, and 404 page to `src/features/`.
+- Centralization of routing in `src/app/router/`.
+- Relocation of the `ThemeProvider` to `src/app/providers/`.
+- Move still-used images to `src/assets/` and then remove `public/` conten (except favicon.png).
+- Add French while keeping the English and Arabic resources.
