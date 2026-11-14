@@ -79,5 +79,20 @@ class CampaignPublic(BaseModel):
 
 
 class CampaignProgressOut(CampaignPublic):
-    """CAT-01 / CAT-02 — campagne publique avec jauge (hérite de CampaignPublic)."""
+    """campagne publique avec jauge (hérite de CampaignPublic)."""
     progress_percent: float = Field(0.0, ge=0, le=100)
+
+class JaugeOut(BaseModel):
+    id_campaign: UUID
+    objectif: Decimal | None
+    collecte: Decimal
+    pourcentage: float
+
+#class FinancialDonOut(BaseModel):
+ #   id_don_f: UUID
+  #  amount: Decimal
+   # status: str
+    #created_at: datetime
+    #is_anonymous: bool
+    
+    #model_config = ConfigDict(from_attributes=True)

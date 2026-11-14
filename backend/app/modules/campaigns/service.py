@@ -102,3 +102,46 @@ def delete_campaign(session: Session, *, user: User, id_campaign: UUID) -> None:
     campaign = _get_or_raise(session, id_campaign)
     campaign_repo.delete_campaign(session, campaign)
     session.commit()
+# ... (vos fonctions existantes)
+from app.modules.campaigns.schemas import JaugeOut#, FinancialDonOut
+from datetime import datetime
+
+def list_campaigns_filtered(session: Session, *, status: str | None, start_at: datetime | None, finish_at: datetime | None, limit: int, offset: int) -> list[CampaignOut]:
+    campaigns = campaign_repo.list_filtered_campaigns(
+        session, status=status, start_at=start_at, finish_at=finish_at, limit=limit, offset=offset
+    )
+    return [CampaignOut.model_validate(c) for c in campaigns]
+
+def publish_campaign_action(session: Session, *, user: User, id_campaign: UUID) -> CampaignOut:
+    campaign = _get_or_raise(session, id_campaign)
+    if campaign.status != "Draft":
+        raise ValueError("Seule une campagne en brouillon peut être publiée.")
+    campaign_repo.publish_campaign(session, campaign)
+    session.commit()
+    session.refresh(campaign)
+    return CampaignOut.model_validate(campaign)
+
+def close_campaign_action(session: Session, *, user: User, id_campaign: UUID, reason: str | None = None) -> CampaignOut:
+    campaign = _get_or_raise(session, id_campaign)
+    if campaign.status == "closed":
+        raise ValueError("La campagne est déjà clôturée.")
+    campaign_repo.close_campaign(session, campaign, reason)
+    session.commit()
+    session.refresh(campaign)
+    return CampaignOut.model_validate(campaign)
+
+def get_jauge(session: Session, id_campaign: UUID) -> JaugeOut:
+    campaign = _get_or_raise(session, id_campaign)
+    collecte = campaign_repo.get_campaign_amount_collected(session, id_campaign)
+    pourcentage = _progress_percent(collecte, campaign.goal)
+    return JaugeOut(
+        id_campaign=campaign.id_campaign,
+        objectif=campaign.goal,
+        collecte=collecte,
+        pourcentage=pourcentage
+    )
+
+#def get_campaign_donations(session: Session, id_campaign: UUID) -> list[FinancialDonOut]:
+ #   _get_or_raise(session, id_campaign) # Vérifie que la campagne existe
+  #  dons = campaign_repo.get_donations_by_campaign(session, id_campaign)
+   # return [FinancialDonOut.model_validate(d) for d in dons]
