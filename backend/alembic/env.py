@@ -17,8 +17,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# L'URL de la base vient de DATABASE_URL (jamais écrite dans alembic.ini).
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+# L'URL de la base vient de SUPABASE_URL (jamais écrite dans alembic.ini).
+config.set_main_option("sqlalchemy.url", settings.SUPABASE_URL.replace("%", "%%"))
 
 # Importe les modèles de chaque module pour que `alembic revision --autogenerate` les voie.
 for module_name in MODULES:
