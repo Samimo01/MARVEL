@@ -14,7 +14,9 @@ from app.modules.campaigns.router import (
 )
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.distributions.router import router as distributions_router
-from app.modules.donations.router import router as donations_router
+from app.modules.natural_donations.router import router as natural_donations_router
+from app.modules.financial_donations.router import router as financial_donations_router
+
 from app.modules.receipts.router import router as receipts_router
 from app.modules.stock.router import router as stock_router
 from app.modules.volunteers.router import router as volunteers_router
@@ -28,7 +30,8 @@ for module_router in (
     auth_admin_router,
     campaigns_router,
     campaign_catalog_router,
-    donations_router,
+    financial_donations_router,
+    natural_donations_router,
     receipts_router,
     stock_router,
     beneficiaries_router,
