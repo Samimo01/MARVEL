@@ -76,6 +76,13 @@ Les origines autorisées (CORS) sont définies par `CORS_ORIGINS` dans `.env` :
 par défaut `http://localhost:5173` (frontend-public) et `http://localhost:5174` (frontend-admin).
 En production, mettre ici les domaines réels.
 
+## Création de compte
+
+`POST /api/v1/auth/register` crée un compte à partir du prénom, du nom, de l'e-mail et
+du mot de passe (pseudonyme et téléphone facultatifs). Aucun rôle n'est attribué à
+l'inscription ; les rôles sont gérés séparément par un administrateur. La création ne
+dépend pas de la configuration d'un service d'e-mail.
+
 ## Base de données (Alembic)
 
 ```powershell
