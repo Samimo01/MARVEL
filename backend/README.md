@@ -82,8 +82,38 @@ En production, mettre ici les domaines réels.
 du mot de passe et du téléphone, puis renvoie un token d'accès JWT de type Bearer.
 La clé `JWT_SECRET_KEY` doit contenir au moins 32 octets et être définie dans `.env`
 (génération : `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
-Aucun rôle n'est attribué à l'inscription ; les rôles sont gérés séparément par un
-administrateur. La création ne dépend pas de la configuration d'un service d'e-mail.
+Aucun rôle n'est attribué à l'inscription. Un administrateur peut consulter les rôles
+disponibles avec `GET /api/v1/admin/roles`, voir les affectations d'un utilisateur avec
+`GET /api/v1/admin/users/{id_user}/roles` et modifier une affectation avec
+`POST /api/v1/admin/users/{id_user}/roles/{role_name}`, en envoyant
+`{"assignment_type":"assigned"}` ou `{"assignment_type":"revoked"}`. Ces routes exigent
+un JWT d'administrateur. Le dernier administrateur actif ne peut pas se révoquer.
+La création ne dépend pas de la configuration d'un service d'e-mail.
+La création, la modification, la publication, la clôture et la suppression d'une campagne
+requièrent un rôle actif `Collection_Manager` ou `Administrator` dans `role_assignments`.
+Le catalogue public des campagnes reste accessible sans ces rôles.
+
+Le premier administrateur doit être initialisé hors API, avec une opération SQL exécutée
+par un propriétaire de la base (remplacer l'adresse e-mail) :
+
+```sql
+INSERT INTO public.roles (role_name)
+VALUES ('Administrator')
+ON CONFLICT (role_name) DO NOTHING;
+
+INSERT INTO public.role_assignments (assignment_type, id_role, id_user)
+SELECT 'assigned', roles.id_role, users.id_user
+FROM public.roles
+CROSS JOIN public.users
+WHERE roles.role_name = 'Administrator'
+  AND users.email = 'admin@example.com'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.role_assignments
+    WHERE id_role = roles.id_role
+      AND id_user = users.id_user
+  );
+```
 
 ## Connexion
 

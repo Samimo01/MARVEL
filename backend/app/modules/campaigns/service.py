@@ -1,8 +1,10 @@
 """Logique métier du module campaigns."""
 
 from datetime import datetime
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
+
 
 from sqlalchemy.orm import Session
 

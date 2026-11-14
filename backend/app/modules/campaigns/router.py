@@ -1,7 +1,9 @@
 """Endpoints HTTP du module campaigns."""
 
 from datetime import datetime
+from datetime import datetime
 from uuid import UUID
+
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -9,12 +11,23 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user, require_campaign_editor
 from app.database import get_db
 from app.modules.auth.models import User
+from app.modules.campaigns import repository as campaign_repo
 from app.modules.campaigns import service as campaign_service
 from app.modules.campaigns.schemas import (
+    CampaignCreate,
+    CampaignOut,
+    CampaignProgressOut,
+    CampaignUpdate,
+    GaugeOut,
+    PublicationIn,
+    # FinancialDonOut,
     CampaignCreate, CampaignOut, CampaignProgressOut, CampaignUpdate,
     GaugeOut#, FinancialDonOut
 )
 from app.modules.campaigns.service import (
+    CampaignNotFoundError,
+    CampaignTitleAlreadyExistsError,
+    CannotPublishClosedCampaignError,
     CampaignNotFoundError, CampaignTitleAlreadyExistsError, InvalidStatusTransitionError
 )
 
