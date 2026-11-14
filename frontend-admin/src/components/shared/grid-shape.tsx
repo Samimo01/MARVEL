@@ -1,3 +1,5 @@
+import gridShape from "@/assets/images/shape/grid-01.svg";
+
 export default function GridShape() {
   return (
     <>
@@ -5,7 +7,7 @@ export default function GridShape() {
         <img
           width={540}
           height={254}
-          src="/images/shape/grid-01.svg"
+          src={gridShape}
           alt="grid"
         />
       </div>
@@ -13,7 +15,7 @@ export default function GridShape() {
         <img
           width={540}
           height={254}
-          src="/images/shape/grid-01.svg"
+          src={gridShape}
           alt="grid"
         />
       </div>
