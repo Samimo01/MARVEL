@@ -28,8 +28,9 @@ def auth_client(
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine, tables=[User.__table__])
     test_session = sessionmaker(bind=engine, autoflush=False)
+    monkeypatch.setattr("app.main.SessionLocal", test_session)
 
     def override_get_db() -> Iterator[Session]:
         with test_session() as session:
@@ -42,7 +43,7 @@ def auth_client(
             yield client, test_session
     finally:
         app.dependency_overrides.clear()
-        Base.metadata.drop_all(engine)
+        Base.metadata.drop_all(engine, tables=[User.__table__])
         engine.dispose()
 
 
