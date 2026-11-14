@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    Boolean, Computed, DateTime, ForeignKey, Numeric, String, Uuid, func,
+    Boolean, Computed, DateTime, ForeignKey, Numeric, String, Uuid, func, types,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM
 from sqlalchemy.orm import Mapped, mapped_column
@@ -25,6 +25,22 @@ campaign_category_type = ENUM(
 )
 
 
+class ArrayOfEnum(types.TypeDecorator):
+    """Utilise ARRAY sur PostgreSQL, et JSON sur SQLite (pour les tests)."""
+    impl = types.JSON
+    cache_ok = True
+
+    def __init__(self, enum_type, *args, **kwargs):
+        self.enum_type = enum_type
+        super().__init__(*args, **kwargs)
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(ARRAY(self.enum_type))
+        else:
+            return dialect.type_descriptor(types.JSON)
+
+
 class Campaign(Base):
     __tablename__ = "campaigns"
 
@@ -39,7 +55,9 @@ class Campaign(Base):
     status: Mapped[str] = mapped_column(
         campaign_status_type, nullable=False, default="Draft", server_default="Draft"
     )
-    categories: Mapped[list[str] | None] = mapped_column(ARRAY(campaign_category_type))
+    
+    categories: Mapped[list[str] | None] = mapped_column(ArrayOfEnum(campaign_category_type))
+    
     image_url: Mapped[str | None] = mapped_column(String)
     closure_reason: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(

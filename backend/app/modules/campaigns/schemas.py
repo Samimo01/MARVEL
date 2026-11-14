@@ -82,12 +82,12 @@ class GaugeOut(BaseModel):
     percentage: float
 
 
-#class FinancialDonOut(BaseModel):
- #   """CAM-06 : Dons rattachés à une campagne."""
-  #  id_don_f: UUID
-   # amount: Decimal
-    #status: str
-    #created_at: datetime
-    #is_anonymous: bool
+class FinancialDonOut(BaseModel):
+    """CAM-06 : Dons rattachés à une campagne."""
+    id_don_f: UUID
+    amount: Decimal
+    status: str
+    created_at: datetime
+    is_anonymous: bool
     
-    #model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)

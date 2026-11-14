@@ -1,10 +1,8 @@
 """Logique métier du module campaigns."""
 
 from datetime import datetime
-from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
-
 
 from sqlalchemy.orm import Session
 
@@ -12,9 +10,15 @@ from app.modules.auth.models import User
 from app.modules.campaigns import repository as campaign_repo
 from app.modules.campaigns.models import Campaign
 from app.modules.campaigns.schemas import (
-    CampaignCreate, CampaignOut, CampaignProgressOut, CampaignUpdate,
-    GaugeOut#, FinancialDonOut
+    CampaignCreate, 
+    CampaignOut, 
+    CampaignProgressOut, 
+    CampaignUpdate,
+    GaugeOut
 )
+from app.modules.financial_donations import service as don_service
+from app.modules.financial_donations.schemas import FinancialDonOut
+
 
 # ============================================================
 # Exceptions
@@ -34,11 +38,16 @@ def _progress_percent(collected: Decimal, goal: Decimal | None) -> float:
 
 def _to_progress_out(campaign: Campaign, collected: Decimal) -> CampaignProgressOut:
     return CampaignProgressOut(
-        id_campaign=campaign.id_campaign, title=campaign.title,
-        description=campaign.description, goal=campaign.goal,
-        collected_amount=collected, start_at=campaign.start_at,
-        finish_at=campaign.finish_at, categories=campaign.categories,
-        image_url=campaign.image_url, status=campaign.status,
+        id_campaign=campaign.id_campaign, 
+        title=campaign.title,
+        description=campaign.description, 
+        goal=campaign.goal,
+        collected_amount=collected, 
+        start_at=campaign.start_at,
+        finish_at=campaign.finish_at, 
+        categories=campaign.categories,
+        image_url=campaign.image_url, 
+        status=campaign.status,
         progress_percent=_progress_percent(collected, campaign.goal),
     )
 
@@ -58,16 +67,16 @@ def list_active_campaigns(session: Session, *, limit: int = 50, offset: int = 0)
         return []
     
     ids = [c.id_campaign for c in campaigns]
-    amounts = campaign_repo.get_campaigns_amounts_collected(session, ids)
+    amounts = don_service.get_campaigns_amounts_collected(session, ids)
     
-    return [_to_progress_out(c, amounts.get(c.id_campaign, Decimal(0))) for c in campaigns]
+    return [_to_progress_out(c, amounts.get(c.id_campaign, Decimal("0.00"))) for c in campaigns]
 
 def get_public_campaign(session: Session, id_campaign: UUID) -> CampaignProgressOut:
     campaign = campaign_repo.get_published_campaign_by_id(session, id_campaign)
     if campaign is None:
         raise CampaignNotFoundError(f"Campagne {id_campaign} introuvable")
     
-    collected = campaign_repo.get_campaign_amount_collected(session, id_campaign)
+    collected = don_service.get_campaign_amount_collected(session, id_campaign)
     return _to_progress_out(campaign, collected)
 
 def list_closed_campaigns(session: Session, *, limit: int = 50, offset: int = 0) -> list[CampaignProgressOut]:
@@ -77,14 +86,14 @@ def list_closed_campaigns(session: Session, *, limit: int = 50, offset: int = 0)
         return []
     
     ids = [c.id_campaign for c in campaigns]
-    amounts = campaign_repo.get_campaigns_amounts_collected(session, ids)
+    amounts = don_service.get_campaigns_amounts_collected(session, ids)
     
-    return [_to_progress_out(c, amounts.get(c.id_campaign, Decimal(0))) for c in campaigns]
+    return [_to_progress_out(c, amounts.get(c.id_campaign, Decimal("0.00"))) for c in campaigns]
 
 def get_gauge(session: Session, id_campaign: UUID) -> GaugeOut:
     """CAM-05 : Jauge de progression."""
     campaign = _get_or_raise(session, id_campaign)
-    collected = campaign_repo.get_campaign_amount_collected(session, id_campaign)
+    collected = don_service.get_campaign_amount_collected(session, id_campaign)
     
     return GaugeOut(
         id_campaign=campaign.id_campaign,
@@ -106,6 +115,10 @@ def create_campaign(session: Session, *, user: User, payload: CampaignCreate) ->
     session.commit()
     session.refresh(campaign)
     return CampaignOut.model_validate(campaign)
+
+def create_draft_campaign(session: Session, *, user: User, payload: CampaignCreate) -> CampaignOut:
+    """CAM-11 : Créer une campagne en mode brouillon."""
+    return create_campaign(session, user=user, payload=payload)
 
 def update_campaign(session: Session, *, user: User, id_campaign: UUID, payload: CampaignUpdate) -> CampaignOut:
     campaign = _get_or_raise(session, id_campaign)
@@ -137,7 +150,7 @@ def delete_campaign(session: Session, *, user: User, id_campaign: UUID) -> None:
 
 
 # ============================================================
-# WORKFLOW (CAM-03, CAM-04, CAM-06, CAM-08, CAM-09)
+# WORKFLOW (CAM-03, CAM-04, CAM-06, CAM-08, CAM-09, CAM-10)
 # ============================================================
 def publish_campaign_action(session: Session, *, user: User, id_campaign: UUID) -> CampaignOut:
     """CAM-03 : Brouillon vers En_Cours."""
@@ -161,16 +174,20 @@ def close_campaign_action(session: Session, *, user: User, id_campaign: UUID, re
     session.refresh(campaign)
     return CampaignOut.model_validate(campaign)
 
-#def get_campaign_donations(session: Session, id_campaign: UUID) -> list[FinancialDonOut]:
- #   """CAM-06 : Dons rattachés à la campagne."""
-  #  _get_or_raise(session, id_campaign)
-   # donations = campaign_repo.get_donations_by_campaign(session, id_campaign)
-    #return [FinancialDonOut.model_validate(d) for d in donations]
+def get_campaign_donations(session: Session, id_campaign: UUID) -> list[FinancialDonOut]:
+    """CAM-06 : Dons rattachés à la campagne."""
+    _get_or_raise(session, id_campaign)
+    return don_service.list_campaign_donations(session, id_campaign)
 
-#def list_user_drafts(session: Session, *, user: User) -> list[CampaignOut]:
-#    """CAM-08 : Brouillons de l'utilisateur connecté."""
-#    drafts = campaign_repo.list_user_drafts(session, user.id_user)
-#   return [CampaignOut.model_validate(c) for c in drafts]
+def list_user_drafts(session: Session, id_user: UUID) -> list[CampaignOut]:
+    """CAM-08 : Brouillons d'un utilisateur spécifique."""
+    drafts = campaign_repo.list_user_drafts(session, id_user)
+    return [CampaignOut.model_validate(c) for c in drafts]
+
+def list_user_invisible_campaigns(session: Session, id_user: UUID) -> list[CampaignOut]:
+    """CAM-10 : Toutes les campagnes désactivées d'un utilisateur."""
+    campaigns = campaign_repo.list_user_invisible_campaigns(session, id_user)
+    return [CampaignOut.model_validate(c) for c in campaigns]
 
 def list_all_campaigns(
     session: Session, 

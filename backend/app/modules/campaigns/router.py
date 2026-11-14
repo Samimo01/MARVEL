@@ -1,6 +1,5 @@
 """Endpoints HTTP du module campaigns."""
 
-
 from datetime import datetime
 from uuid import UUID
 
@@ -16,31 +15,26 @@ from app.modules.campaigns.schemas import (
     CampaignOut,
     CampaignProgressOut,
     CampaignUpdate,
-    # FinancialDonOut,
-    CampaignCreate, CampaignOut, CampaignProgressOut, CampaignUpdate,
-    GaugeOut#, FinancialDonOut
+    FinancialDonOut,
+    GaugeOut,
 )
 from app.modules.campaigns.service import (
     CampaignNotFoundError,
     CampaignTitleAlreadyExistsError,
     InvalidStatusTransitionError,
-    CampaignNotFoundError, CampaignTitleAlreadyExistsError, InvalidStatusTransitionError
 )
+
 
 # ============================================================
 # Déclaration des routers
 # ============================================================
-# Routes publiques (catalog en français)
-campaign_catalog_router = APIRouter(prefix="/catalog/campagnes", tags=["catalog"])
-
-# Routes privées (Gestion en anglais)
+campaign_catalog_router = APIRouter(prefix="/catalog/campaigns", tags=["catalog"])
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 
 
 # ============================================================
 # ROUTES PUBLIQUES (CAT-01, CAT-02, CAM-07)
 # ============================================================
-
 @campaign_catalog_router.get("", response_model=list[CampaignProgressOut])
 def cat01_list_active_campaigns(
     session: Session = Depends(get_db),
@@ -73,14 +67,12 @@ def cat02_campaign_detail(
 
 # ============================================================
 # ROUTES PRIVÉES DE CRÉATION ET LISTES SPÉCIFIQUES
-# (Déclarées AVANT /{id_campaign} pour éviter les conflits)
 # ============================================================
-
 @router.post("/draft", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
 def cam11_create_draft_campaign(
     payload: CampaignCreate,
     session: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor), # Resp. collecte, Admin
+    user: User = Depends(require_campaign_editor),
 ):
     """CAM-11 : Créer une campagne en mode brouillon."""
     try:
@@ -92,7 +84,7 @@ def cam11_create_draft_campaign(
 def cam08_list_user_drafts(
     id_user: UUID,
     session: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user) # Authentifié
+    current_user: User = Depends(get_current_user),
 ):
     """CAM-08 : Les brouillons d'une personne."""
     return campaign_service.list_user_drafts(session, id_user)
@@ -101,7 +93,7 @@ def cam08_list_user_drafts(
 def cam10_list_user_invisible_campaigns(
     id_user: UUID,
     session: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user) # Admin, bénéficiaire, resp.
+    current_user: User = Depends(get_current_user),
 ):
     """CAM-10 : Toutes les campagnes désactivées d'un utilisateur."""
     return campaign_service.list_user_invisible_campaigns(session, id_user)
@@ -110,14 +102,13 @@ def cam10_list_user_invisible_campaigns(
 # ============================================================
 # ROUTES PRIVÉES DE GESTION GLOBALE
 # ============================================================
-
 @router.post("", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
 def cat07_create_campaign(
     payload: CampaignCreate,
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor),
 ):
-    """CAT-07 : Créer une campagne (directement publiée ou en brouillon selon la logique métier)."""
+    """CAT-07 : Créer une campagne."""
     try:
         return campaign_service.create_campaign(session, user=user, payload=payload)
     except CampaignTitleAlreadyExistsError as exc:
@@ -131,7 +122,7 @@ def cam09_list_all_campaigns(
     limit: int = 50,
     offset: int = 0,
     session: Session = Depends(get_db),
-    user: User = Depends(get_current_user) # Admin
+    user: User = Depends(get_current_user),
 ):
     """CAM-09 : Toutes les campagnes."""
     return campaign_service.list_all_campaigns(
@@ -140,9 +131,9 @@ def cam09_list_all_campaigns(
 
 @router.get("/{id_campaign}", response_model=CampaignOut)
 def cam02_get_campaign_private(
-    id_campaign: UUID, 
+    id_campaign: UUID,
     session: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor)
+    user: User = Depends(require_campaign_editor),
 ):
     """Détail privé d'une campagne."""
     try:
@@ -196,7 +187,6 @@ def cat10_delete_campaign(
 # ============================================================
 # ROUTES WORKFLOW (CAM-03, CAM-04, CAM-05, CAM-06)
 # ============================================================
-
 @router.post("/{id_campaign}/publish", response_model=CampaignOut)
 def cam03_publish_campaign(
     id_campaign: UUID,
@@ -228,25 +218,25 @@ def cam04_close_campaign(
     except InvalidStatusTransitionError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
-#@router.get("/{id_campaign}/gauge", response_model=GaugeOut)
-#def cam05_get_gauge(
- #   id_campaign: UUID,
-  #  session: Session = Depends(get_db),
-#):
- #   """CAM-05 : Jauge de progression (Public)."""
-  #  try:
-   #     return campaign_service.get_gauge(session, id_campaign)
-    #except CampaignNotFoundError as exc:
-     #   raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+@router.get("/{id_campaign}/gauge", response_model=GaugeOut)
+def cam05_get_gauge(
+    id_campaign: UUID,
+    session: Session = Depends(get_db),
+):
+    """CAM-05 : Jauge de progression (Public)."""
+    try:
+        return campaign_service.get_gauge(session, id_campaign)
+    except CampaignNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
-#@router.get("/{id_campaign}/donations", response_model=list[FinancialDonOut])
-#def cam06_get_donations(
- #   id_campaign: UUID,
-  #  session: Session = Depends(get_db),
-   # user: User = Depends(get_current_user),
-#):
- #   """CAM-06 : Dons rattachés à la campagne."""
-  #  try:
-   #     return campaign_service.get_campaign_donations(session, id_campaign)
-    #except CampaignNotFoundError as exc:
-     #   raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+@router.get("/{id_campaign}/donations", response_model=list[FinancialDonOut])
+def cam06_get_donations(
+    id_campaign: UUID,
+    session: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """CAM-06 : Dons rattachés à la campagne."""
+    try:
+        return campaign_service.get_campaign_donations(session, id_campaign)
+    except CampaignNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc

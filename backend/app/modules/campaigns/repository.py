@@ -4,11 +4,10 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, cast, Numeric
 from sqlalchemy.orm import Session
 
 from app.modules.campaigns.models import Campaign
-#from app.modules.donations.models import FinancialDon 
 
 
 # ============================================================
@@ -122,38 +121,3 @@ def close_campaign(session: Session, campaign: Campaign, reason: str | None = No
 def delete_campaign(session: Session, campaign: Campaign) -> None:
     session.delete(campaign)
     session.flush()
-
-
-# ============================================================
-# AGRÉGATS & DONS
-# ============================================================
-#def get_campaign_amount_collected(session: Session, id_campaign: UUID) -> Decimal:
- #   """Calcule la somme des dons réussis pour une campagne."""
-  #  total = session.scalar(
-   #     select(func.coalesce(func.sum(FinancialDon.amount), 0)).where(
-    #        FinancialDon.id_campaign == id_campaign, 
-     #       FinancialDon.status == "Success"
-      #  )
-    #)
-    #return Decimal(total or 0)
-
-#def get_campaigns_amounts_collected(session: Session, ids: list[UUID]) -> dict[UUID, Decimal]:
- #   """Batch pour éviter le N+1."""
-  #  if not ids: 
-   #     return {}
-    #rows = session.execute(
-     #   select(FinancialDon.id_campaign, func.coalesce(func.sum(FinancialDon.amount), 0))
-      #  .where(
-       #     FinancialDon.id_campaign.in_(ids), 
-        #    FinancialDon.status == "Success"
-  #      )
-   #     .group_by(FinancialDon.id_campaign)
-    #).all()
-    #return {row[0]: Decimal(row[1]) for row in rows}
-
-#def get_donations_by_campaign(session: Session, id_campaign: UUID) -> list[FinancialDon]:
- #   """Récupère la liste des dons d'une campagne."""
-  #  return list(session.scalars(
-   #     select(FinancialDon).where(FinancialDon.id_campaign == id_campaign)
-    #    .order_by(FinancialDon.created_at.desc())
-    #).all())
