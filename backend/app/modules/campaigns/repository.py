@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-
+from datetime import datetime
 # Correction des imports
 from app.modules.campaigns.models import Campaign
 #from app.modules.donations.models import FinancialDon 
@@ -68,3 +68,48 @@ def delete_campaign(session: Session, campaign: Campaign) -> None:
      #   .group_by(FinancialDon.id_campaign)
     #).all()
     #return {row[0]: Decimal(row[1]) for row in rows}
+
+# ... (vos fonctions existantes)
+
+def list_filtered_campaigns(
+    session: Session, 
+    *, 
+    status: str | None = None, 
+    start_at: datetime | None = None, 
+    finish_at: datetime | None = None, 
+    limit: int = 50, 
+    offset: int = 0
+) -> list[Campaign]:
+    stmt = select(Campaign)
+    
+    if status:
+        stmt = stmt.where(Campaign.status == status)
+    if start_at:
+        stmt = stmt.where(Campaign.start_at >= start_at)
+    if finish_at:
+        stmt = stmt.where(Campaign.finish_at <= finish_at)
+
+    stmt = stmt.order_by(Campaign.created_at.desc()).limit(limit).offset(offset)
+    return list(session.scalars(stmt).all())
+
+def close_campaign(session: Session, campaign: Campaign, reason: str | None = None) -> Campaign:
+    campaign.status = "closed"
+    if reason:
+        campaign.closure_reason = reason
+    session.flush()
+    return campaign
+
+#def get_donations_by_campaign(session: Session, id_campaign: UUID) -> list[FinancialDon]:
+    # Assurez-vous que l'import from app.modules.donations.models import FinancialDon est actif
+ #   return list(session.scalars(
+  #      select(FinancialDon).where(FinancialDon.id_campaign == id_campaign)
+   # ).all())
+
+#def get_campaign_amount_collected(session: Session, id_campaign: UUID) -> Decimal:
+ #   total = session.scalar(
+  #      select(func.coalesce(func.sum(FinancialDon.amount), 0)).where(
+   #         FinancialDon.id_campaign == id_campaign, 
+    #        FinancialDon.status == "Success"
+     #   )
+    #)
+    #return Decimal(total orz 0)

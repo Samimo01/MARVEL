@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     app_name: str = "Projet Devops - API"
     api_prefix: str = "/api/v1"
 
-    SUPABASE_URL: str = (
+    DATABASE_URL: str = (
         "postgresql+psycopg://postgres:postgres@localhost:5432/DevopsProject"
     )
     cors_origins: str = "http://localhost:5173,http://localhost:5174"
