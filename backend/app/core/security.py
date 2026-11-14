@@ -12,6 +12,10 @@ def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 
+def verify_password(password: str, password_hash_value: str) -> bool:
+    return password_hash.verify(password, password_hash_value)
+
+
 def create_access_token(subject: str) -> str:
     secret_key = settings.jwt_secret_key
     if len(secret_key.encode("utf-8")) < 32:

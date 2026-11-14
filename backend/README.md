@@ -85,6 +85,14 @@ La clé `JWT_SECRET_KEY` doit contenir au moins 32 octets et être définie dans
 Aucun rôle n'est attribué à l'inscription ; les rôles sont gérés séparément par un
 administrateur. La création ne dépend pas de la configuration d'un service d'e-mail.
 
+## Connexion
+
+`POST /api/v1/auth/login` accepte une adresse e-mail et un mot de passe, puis renvoie
+un JWT de type Bearer si les identifiants sont valides. Le token expire après 30 jours
+par défaut (`ACCESS_TOKEN_EXPIRE_MINUTES=43200`). Le frontend peut le conserver dans
+`localStorage` et l'envoyer dans l'en-tête `Authorization: Bearer <token>` pour ses
+requêtes authentifiées.
+
 ## Base de données (Alembic)
 
 ```powershell
