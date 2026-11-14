@@ -1,4 +1,6 @@
 import re
+from datetime import datetime
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, SecretStr, field_validator
@@ -48,3 +50,29 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class RoleName(StrEnum):
+    VOLUNTEER = "Volunteer"
+    COLLECTION_MANAGER = "Collection_Manager"
+    STOCK_MANAGER = "Stock_Manager"
+    TREASURER = "Treasurer"
+    ADMINISTRATOR = "Administrator"
+
+
+class RoleAssignmentStatus(StrEnum):
+    ASSIGNED = "assigned"
+    REVOKED = "revoked"
+
+
+class RoleAssignmentRequest(BaseModel):
+    assignment_type: RoleAssignmentStatus
+
+
+class RoleAssignmentResponse(BaseModel):
+    id_role_assignment: UUID
+    id_user: UUID
+    id_role: UUID
+    role_name: RoleName
+    assignment_type: RoleAssignmentStatus
+    created_at: datetime

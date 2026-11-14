@@ -1,33 +1,44 @@
 """Endpoints HTTP du module campaigns."""
 
+from datetime import datetime
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
-from app.core.dependencies import get_current_user 
+
+from app.core.dependencies import require_campaign_editor
+
 # Corrections des imports
 from app.database import get_db
-from app.core.dependencies import require_campaign_editor
 from app.modules.auth.models import User
+from app.modules.campaigns import repository as campaign_repo
 from app.modules.campaigns import service as campaign_service
 from app.modules.campaigns.schemas import (
-    CampaignCreate, CampaignOut, CampaignProgressOut, CampaignUpdate, PublicationIn,JaugeOut, #FinancialDonOut,
+    CampaignCreate,
+    CampaignOut,
+    CampaignProgressOut,
+    CampaignUpdate,
+    GaugeOut,
+    PublicationIn,
+    # FinancialDonOut,
 )
 from app.modules.campaigns.service import (
-    CampaignNotFoundError, CampaignTitleAlreadyExistsError, CannotPublishClosedCampaignError,
+    CampaignNotFoundError,
+    CampaignTitleAlreadyExistsError,
+    CannotPublishClosedCampaignError,
 )
 
 # ============================================================
 # Deux routers : gestion (auth) + catalogue public
 # ============================================================
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
-catalogue_router = APIRouter(prefix="/catalogue/campagnes", tags=["catalogue"])
+campaign_catalog_router = APIRouter(prefix="/catalogue/campaigns", tags=["campaign catalog"])
 
 
 # ============================================================
-# CAT-01 — GET /catalogue/campagnes (Public)
+# CAT-01 — GET /catalogue/campaigns (Public)
 # ============================================================
-@catalogue_router.get("", response_model=list[CampaignProgressOut])
+@campaign_catalog_router.get("", response_model=list[CampaignProgressOut])
 def cat01_list_active_campaigns(
     session: Session = Depends(get_db), 
     limit: int = 50,
@@ -37,9 +48,9 @@ def cat01_list_active_campaigns(
 
 
 # ============================================================
-# CAT-02 — GET /catalogue/campagnes/{id} (Public)
+# CAT-02 — GET /catalogue/campaigns/{id} (Public)
 # ============================================================
-@catalogue_router.get("/{id_campaign}", response_model=CampaignProgressOut)
+@campaign_catalog_router.get("/{id_campaign}", response_model=CampaignProgressOut)
 def cat02_campaign_detail(
     id_campaign: UUID,
     session: Session = Depends(get_db),
@@ -51,7 +62,7 @@ def cat02_campaign_detail(
 
 
 # ============================================================
-# CAT-07 — POST /campaigns (Resp, Admin, Bénéficiaire)
+# CAT-07 — POST /campaigns (Gestionnaire de collecte, Administrateur)
 # ============================================================
 @router.post("", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
 def cat07_create_campaign(
@@ -66,7 +77,7 @@ def cat07_create_campaign(
 
 
 # ============================================================
-# CAT-08 — PUT /campaigns/{id} (Resp, Admin, Bénéficiaire)
+# CAT-08 — PUT /campaigns/{id} (Gestionnaire de collecte, Administrateur)
 # ============================================================
 @router.put("/{id_campaign}", response_model=CampaignOut)
 def cat08_update_campaign(
@@ -106,7 +117,7 @@ def cat09_publish_campaign(
 
 
 # ============================================================
-# CAT-10 — DELETE /campaigns/{id} (Resp, Admin, Bénéficiaire)
+# CAT-10 — DELETE /campaigns/{id} (Gestionnaire de collecte, Administrateur)
 # ============================================================
 @router.delete("/{id_campaign}", status_code=status.HTTP_204_NO_CONTENT)
 def cat10_delete_campaign(
@@ -122,12 +133,11 @@ def cat10_delete_campaign(
 # ... (vos imports existants)
 
 # ============================================================
-# NOUVEAU ROUTER : CAM-01 à CAM-06
+# CAM-01 à CAM-06
 # ============================================================
-campagnes_router = APIRouter(prefix="/campagnes", tags=["campagnes"])
 
 # CAM-01 : Liste paginée
-@campagnes_router.get("", response_model=list[CampaignOut])
+@router.get("", response_model=list[CampaignOut])
 def cam01_list_campaigns(
     status: str | None = None,
     start_at: datetime | None = None,
@@ -135,18 +145,18 @@ def cam01_list_campaigns(
     limit: int = 50,
     offset: int = 0,
     session: Session = Depends(get_db),
-    user: User = Depends(get_current_user) # Resp, Trésorier, Admin (à affiner si besoin)
+    user: User = Depends(require_campaign_editor)
 ):
     return campaign_service.list_campaigns_filtered(
         session, status=status, start_at=start_at, finish_at=finish_at, limit=limit, offset=offset
     )
 
 # CAM-02 : Détail d'une campagne
-@campagnes_router.get("/{id_campaign}", response_model=CampaignOut)
+@router.get("/{id_campaign}", response_model=CampaignOut)
 def cam02_get_campaign(
     id_campaign: UUID, 
     session: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(require_campaign_editor)
 ):
     try:
         campaign = campaign_repo.get_campaign_by_id(session, id_campaign)
@@ -156,8 +166,8 @@ def cam02_get_campaign(
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
-# CAM-03 : Publier une campagne (Brouillon vers En_Cours)
-@campagnes_router.post("/{id_campaign}/publier", response_model=CampaignOut)
+# CAM-03 : Publish a draft campaign
+@router.post("/{id_campaign}/publish", response_model=CampaignOut)
 def cam03_publish(
     id_campaign: UUID, 
     session: Session = Depends(get_db),
@@ -168,8 +178,8 @@ def cam03_publish(
     except Exception as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
-# CAM-04 : Clôturer une campagne
-@campagnes_router.post("/{id_campaign}/cloturer", response_model=CampaignOut)
+# CAM-04 : Close a campaign
+@router.post("/{id_campaign}/close", response_model=CampaignOut)
 def cam04_close(
     id_campaign: UUID,
     reason: str | None = None,
@@ -177,23 +187,25 @@ def cam04_close(
     user: User = Depends(require_campaign_editor)
 ):
     try:
-        return campaign_service.close_campaign_action(session, user=user, id_campaign=id_campaign, reason=reason)
+        return campaign_service.close_campaign_action(
+            session, user=user, id_campaign=id_campaign, reason=reason
+        )
     except Exception as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
-# CAM-05 : Jauge (Public)
-@campagnes_router.get("/{id_campaign}/jauge", response_model=JaugeOut)
-def cam05_jauge(
+# CAM-05 : Public campaign gauge
+@router.get("/{id_campaign}/gauge", response_model=GaugeOut)
+def cam05_gauge(
     id_campaign: UUID, 
     session: Session = Depends(get_db)
 ):
     try:
-        return campaign_service.get_jauge(session, id_campaign)
+        return campaign_service.get_gauge(session, id_campaign)
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
-#@campagnes_router.get("/{id_campaign}/dons", response_model=list[FinancialDonOut])
-#def cam06_dons(
+#@router.get("/{id_campaign}/donations", response_model=list[FinancialDonOut])
+#def cam06_donations(
  #   id_campaign: UUID,
   #  session: Session = Depends(get_db),
    # user: User = Depends(get_current_user)

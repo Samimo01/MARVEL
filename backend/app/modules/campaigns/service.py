@@ -1,16 +1,23 @@
 """Logique métier du module campaigns."""
 
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
+
 from sqlalchemy.orm import Session
 
 from app.modules.auth.models import User
-# Correction des imports ci-dessous
 from app.modules.campaigns import repository as campaign_repo
 from app.modules.campaigns.models import Campaign
 from app.modules.campaigns.schemas import (
-    CampaignCreate, CampaignOut, CampaignProgressOut, CampaignUpdate, PublicationIn,
+    CampaignCreate,
+    CampaignOut,
+    CampaignProgressOut,
+    CampaignUpdate,
+    GaugeOut,
+    PublicationIn,
 )
+
 
 class CampaignNotFoundError(Exception): pass
 class CampaignTitleAlreadyExistsError(Exception): pass
@@ -88,7 +95,7 @@ def update_campaign(session: Session, *, user: User, id_campaign: UUID, payload:
 
 def set_campaign_publication(session: Session, *, user: User, id_campaign: UUID, payload: PublicationIn) -> CampaignOut:
     campaign = _get_or_raise(session, id_campaign)
-    if payload.est_publier:
+    if payload.is_published:
         if campaign.status == "closed":
             raise CannotPublishClosedCampaignError(f"Impossible de publier une campagne clôturée ({id_campaign})")
         campaign_repo.publish_campaign(session, campaign)
@@ -103,8 +110,6 @@ def delete_campaign(session: Session, *, user: User, id_campaign: UUID) -> None:
     campaign_repo.delete_campaign(session, campaign)
     session.commit()
 # ... (vos fonctions existantes)
-from app.modules.campaigns.schemas import JaugeOut#, FinancialDonOut
-from datetime import datetime
 
 def list_campaigns_filtered(session: Session, *, status: str | None, start_at: datetime | None, finish_at: datetime | None, limit: int, offset: int) -> list[CampaignOut]:
     campaigns = campaign_repo.list_filtered_campaigns(
@@ -130,15 +135,15 @@ def close_campaign_action(session: Session, *, user: User, id_campaign: UUID, re
     session.refresh(campaign)
     return CampaignOut.model_validate(campaign)
 
-def get_jauge(session: Session, id_campaign: UUID) -> JaugeOut:
+def get_gauge(session: Session, id_campaign: UUID) -> GaugeOut:
     campaign = _get_or_raise(session, id_campaign)
-    collecte = campaign_repo.get_campaign_amount_collected(session, id_campaign)
-    pourcentage = _progress_percent(collecte, campaign.goal)
-    return JaugeOut(
+    collected_amount = campaign_repo.get_campaign_amount_collected(session, id_campaign)
+    percentage = _progress_percent(collected_amount, campaign.goal)
+    return GaugeOut(
         id_campaign=campaign.id_campaign,
-        objectif=campaign.goal,
-        collecte=collecte,
-        pourcentage=pourcentage
+        goal=campaign.goal,
+        collected_amount=collected_amount,
+        percentage=percentage,
     )
 
 #def get_campaign_donations(session: Session, id_campaign: UUID) -> list[FinancialDonOut]:

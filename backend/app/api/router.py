@@ -2,10 +2,16 @@
 from fastapi import APIRouter
 
 from app.api import health, public
+from app.modules.auth.router import admin_router as auth_admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.beneficiaries.router import router as beneficiaries_router
 from app.modules.budget.router import router as budget_router
-from app.modules.campaigns.router import router as campaigns_router, catalogue_router
+from app.modules.campaigns.router import (
+    campaign_catalog_router,
+)
+from app.modules.campaigns.router import (
+    router as campaigns_router,
+)
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.distributions.router import router as distributions_router
 from app.modules.donations.router import router as donations_router
@@ -19,8 +25,9 @@ api_router.include_router(public.router)
 
 for module_router in (
     auth_router,
+    auth_admin_router,
     campaigns_router,
-    catalogue_router,
+    campaign_catalog_router,
     donations_router,
     receipts_router,
     stock_router,

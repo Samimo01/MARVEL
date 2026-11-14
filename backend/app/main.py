@@ -12,7 +12,7 @@ from app.middleware.security import SecurityHeadersMiddleware
 app = FastAPI(title=settings.app_name, version="0.1.0")
 
 # 👇 C'EST ICI QUE LE MIDDLEWARE EST APPLIQUÉ 👇
-# Il s'applique à TOUTES les routes, y compris /campaigns et /catalogue/campagnes
+# Il s'applique à TOUTES les routes, y compris /campaigns et /catalogue/campaigns
 app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(

@@ -43,8 +43,8 @@ class CampaignUpdate(BaseModel):
 class PublicationIn(BaseModel):
     """CAT-09 — PATCH /campaigns/{id}/publication."""
 
-    est_publier: bool
-    date_publication: datetime | None = None  # accepté mais ignoré
+    is_published: bool
+    published_at: datetime | None = None  # accepted but ignored
 
 
 # ============================================================
@@ -63,7 +63,7 @@ class CampaignOut(CampaignBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# 👇 AJOUTEZ CETTE CLASSE MANQUANTE 👇
+
 class CampaignPublic(BaseModel):
     """Schéma public de base pour une campagne."""
     id_campaign: UUID
@@ -82,11 +82,11 @@ class CampaignProgressOut(CampaignPublic):
     """campagne publique avec jauge (hérite de CampaignPublic)."""
     progress_percent: float = Field(0.0, ge=0, le=100)
 
-class JaugeOut(BaseModel):
+class GaugeOut(BaseModel):
     id_campaign: UUID
-    objectif: Decimal | None
-    collecte: Decimal
-    pourcentage: float
+    goal: Decimal | None
+    collected_amount: Decimal
+    percentage: float
 
 #class FinancialDonOut(BaseModel):
  #   id_don_f: UUID
