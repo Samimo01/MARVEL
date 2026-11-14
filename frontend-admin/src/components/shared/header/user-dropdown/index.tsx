@@ -18,7 +18,6 @@ import {
   GearIcon,
   GlobeIcon,
   InfoCircleIcon,
-  LogOutIcon,
   UserCircleIcon,
 } from "@/icons";
 import { cn } from "@/utils";
@@ -44,11 +43,11 @@ export default function UserDropdown() {
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger className="dropdown-toggle flex items-center text-gray-700 dark:text-gray-400">
-        <span className="me-3 h-11 w-11 overflow-hidden rounded-lg">
-          <img src="/images/user/owner.png" alt="User" className="size-11" />
+        <span className="me-3 flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-sm font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+          A
         </span>
 
-        <span className="me-1 block text-sm font-medium">Musharof</span>
+        <span className="me-1 block text-sm font-medium">Administrateur</span>
 
         <ChevronDownIcon
           className={cn(
@@ -61,10 +60,7 @@ export default function UserDropdown() {
       <DropdownMenuContent align="end" sideOffset={12} className="w-65 p-3">
         <div className="px-3 py-2">
           <span className="block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Musharof Chowdhury
-          </span>
-          <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
-            randomuser@pimjo.com
+            Administrateur
           </span>
         </div>
 
@@ -147,10 +143,6 @@ export default function UserDropdown() {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem variant="destructive" render={<Link to="/signin" />}>
-          <LogOutIcon />
-          {t("signOut")}
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

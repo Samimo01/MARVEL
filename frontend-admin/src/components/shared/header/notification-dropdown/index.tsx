@@ -83,7 +83,7 @@ export default function NotificationDropdown() {
               <Fragment key={item.id}>
                 <DropdownMenuItem className="flex items-start gap-3 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-white/5">
                   <Avatar size="default">
-                    <AvatarImage src={item.avatar} alt={item.name} />
+                    <AvatarImage alt={item.name} />
                     <AvatarFallback>{getInitials(item.name)}</AvatarFallback>
                     <AvatarBadge variant={item.status} />
                   </Avatar>
