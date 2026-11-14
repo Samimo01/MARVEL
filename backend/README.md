@@ -53,13 +53,13 @@ pip install -r requirements-dev.txt
 
 # 3. Configuration (le fichier .env n'est jamais versionné)
 Copy-Item .env.example .env
-# puis éditer .env : DATABASE_URL, JWT_SECRET_KEY
+# puis éditer .env : SUPABASE_URL, JWT_SECRET_KEY
 ```
 
 Sous Linux / macOS : `source .venv/bin/activate` et `cp .env.example .env`.
 
 **Avec Supabase** : dans _Project Settings → Database → Connection string_, copier l'URL et
-remplacer le préfixe `postgresql://` par `postgresql+psycopg://` dans `DATABASE_URL`.
+remplacer le préfixe `postgresql://` par `postgresql+psycopg://` dans `SUPABASE_URL`.
 
 ## Lancer l'API
 

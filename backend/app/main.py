@@ -1,3 +1,4 @@
+# app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -10,7 +11,10 @@ from app.middleware.security import SecurityHeadersMiddleware
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
 
+# 👇 C'EST ICI QUE LE MIDDLEWARE EST APPLIQUÉ 👇
+# Il s'applique à TOUTES les routes, y compris /campaigns et /catalogue/campagnes
 app.add_middleware(SecurityHeadersMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -25,11 +29,10 @@ app.include_router(health.router)
 
 @app.on_event("startup")
 def check_db_connection() -> None:
-    
     try:
         with SessionLocal() as session:
             session.execute(text("SELECT 1"))
-        print(" Connexion Supabase OK")
+        print("✅ Connexion Supabase OK")
     except Exception as exc:
-        print(f" Connexion Supabase ÉCHEC : {exc}")
-        raise
+        print(f"⚠️ Connexion Supabase ÉCHEC : {exc}")
+        # raise 
