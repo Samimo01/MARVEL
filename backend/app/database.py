@@ -1,4 +1,4 @@
-"""Connexion SQLAlchemy et dépendance de session FastAPI."""
+
 
 from collections.abc import Iterator
 
@@ -7,12 +7,21 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False)
+
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,      
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=1800,       
+    echo=False,
+)
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 class Base(DeclarativeBase):
-    """Base des modèles SQLAlchemy."""
+    
 
 
 def get_db() -> Iterator[Session]:
