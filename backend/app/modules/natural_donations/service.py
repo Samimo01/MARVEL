@@ -14,8 +14,9 @@ from app.modules.natural_donations.schemas import (
     NaturalDonReject, NaturalDonCollectPlan, NaturalDonItemReception,
     ObjectTypeCreate, ObjectTypeUpdate, ObjectTypeOut
 )
-
-
+from app.core.supabase_client import NATURAL_DONATIONS_BUCKET, supabase_admin
+from app.core.image_utils import convert_image_to_webp
+from app.modules.auth import repository as auth_repo 
 # ============================================================
 # Exceptions
 # ============================================================
@@ -34,7 +35,39 @@ def _get_don_or_raise(session: Session, id_don_n: UUID) -> NaturalDon:
         raise NaturalDonNotFoundError(f"Don en nature {id_don_n} introuvable")
     return don
 
+def _upload_natural_item_image(
+    id_don_n: UUID,
+    id_nat: UUID,
+    image_bytes: bytes,
+    *,
+    replace: bool = False,
+) -> str:
+    """Convertit en WebP, upload vers Supabase, retourne l'URL publique."""
+    webp_bytes = convert_image_to_webp(image_bytes)
+    path = f"{id_don_n}/{id_nat}.webp"
 
+    supabase_admin.storage.from_(NATURAL_DONATIONS_BUCKET).upload(
+        path=path,
+        file=webp_bytes,
+        file_options={
+            "content-type": "image/webp",
+            "upsert": "true" if replace else "false",
+        },
+    )
+
+    return supabase_admin.storage.from_(NATURAL_DONATIONS_BUCKET).get_public_url(path)
+# app/modules/natural_donations/service.py
+
+
+def _is_staff(session: Session, user: User) -> bool:
+    """Vérifie si l'utilisateur a un rôle de staff via le repository d'auth."""
+    for role_name in ("Stock_Manager", "Collection_Manager", "Administrator"):
+        assignment = auth_repo.get_latest_role_assignment(
+            session, user.id_user, role_name
+        )
+        if assignment is not None and assignment.assignment_type == "assigned":
+            return True
+    return False
 # ============================================================
 # NAT-01, NAT-15 à NAT-18 : OBJECT TYPES
 # ============================================================
@@ -100,20 +133,73 @@ def create_natural_don(session: Session, *, user: User, payload: NaturalDonCreat
 
 
 # ============================================================
-# NAT-03 : Uploader une image d'article (Simulation)
+# NAT-03 : Upload (création) de l'image d'un article
 # ============================================================
-def upload_item_image(session: Session, id_don_n: UUID, id_nat: UUID, image_url: str) -> NaturalDonItemOut:
+def upload_item_image(
+    session: Session,
+    *,
+    user: User,
+    id_don_n: UUID,
+    id_nat: UUID,
+    image_bytes: bytes,
+) -> NaturalDonItemOut:
     don = _get_don_or_raise(session, id_don_n)
+
+    is_owner = don.id_user == user.id_user
+    is_staff = _is_staff(session, user) 
+    # 1. Contrôle d'accès : propriétaire OU staff
+    if not is_owner and not is_staff:
+        raise InvalidStatusTransitionError(
+            "Vous n'êtes ni le propriétaire du don ni un membre du staff autorisé."
+        )
+
+    # 2. Vérification du statut (uniquement pour le propriétaire)
+    if not is_staff and don.status != "Declare":
+        raise InvalidStatusTransitionError(
+            "L'image ne peut être ajoutée qu'au statut 'Declare'."
+        )
+
     item = don_repo.get_natural_don_item(session, id_don_n, id_nat)
     if not item:
         raise ItemNotFoundError("Article introuvable")
-    
-    item.image_url = image_url
+
+    if item.image_url:
+        raise InvalidStatusTransitionError(
+            "Une image existe déjà pour cet article. Utilisez PATCH pour la remplacer."
+        )
+
+    url = _upload_natural_item_image(id_don_n, id_nat, image_bytes, replace=False)
+    item.image_url = url
     session.commit()
     session.refresh(item)
     return NaturalDonItemOut.model_validate(item)
 
 
+def replace_item_image(
+    session: Session,
+    *,
+    user: User,
+    id_don_n: UUID,
+    id_nat: UUID,
+    image_bytes: bytes,
+) -> NaturalDonItemOut:
+    don = _get_don_or_raise(session, id_don_n)
+    item = don_repo.get_natural_don_item(session, id_don_n, id_nat)
+    
+    if not item:
+        raise ItemNotFoundError("Article introuvable")
+
+    # 👇 Contrôle d'accès pour le remplacement
+    if don.id_user != user.id_user and not _is_staff(session, user):
+        raise InvalidStatusTransitionError(
+            "Vous n'êtes ni le propriétaire du don ni un membre du staff autorisé."
+        )
+
+    url = _upload_natural_item_image(id_don_n, id_nat, image_bytes, replace=True)
+    item.image_url = url
+    session.commit()
+    session.refresh(item)
+    return NaturalDonItemOut.model_validate(item)
 # ============================================================
 # NAT-04 : Annuler un don
 # ============================================================
