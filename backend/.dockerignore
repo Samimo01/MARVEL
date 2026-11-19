@@ -1,0 +1,30 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+
+# Tests et outils
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Git
+.git/
+.gitignore
+
+# Fichiers sensibles
+.env
+.env.*
+
+# Fichiers système
+.DS_Store
+Thumbs.db

@@ -1,0 +1,57 @@
+{
+  "common": {
+    "home": "Accueil",
+    "edit": "Modifier",
+    "close": "Fermer",
+    "saveChanges": "Enregistrer les modifications",
+    "viewMore": "Voir plus",
+    "delete": "Supprimer",
+    "filter": "Filtrer",
+    "seeAll": "Tout voir",
+    "confirm": "Confirmer",
+    "cancel": "Annuler"
+  },
+  "sidebar": {
+    "groups": {
+      "menu": "Menu",
+      "support": "Assistance",
+      "others": "Autres"
+    },
+    "badges": {
+      "new": "nouveau",
+      "pro": "pro"
+    },
+    "items": {
+      "dashboard": "Tableau de bord",
+      "userProfile": "Profil utilisateur"
+    },
+    "widget": {
+      "title": "Guide d'utilisation",
+      "description": "Le guide d'utilisation sera bientôt disponible."
+    }
+  },
+  "header": {
+    "searchPlaceholder": "Rechercher ou saisir une commande...",
+    "toggleSidebar": "Afficher ou masquer la barre latérale",
+    "notifications": {
+      "title": "Notifications",
+      "requestsPermission": "demande l’autorisation de modifier",
+      "project": "Projet",
+      "minAgo": "il y a {count} min",
+      "hrAgo": "il y a {count} h",
+      "viewAll": "Voir toutes les notifications"
+    }
+  },
+  "userDropdown": {
+    "editProfile": "Modifier le profil",
+    "accountSettings": "Paramètres du compte",
+    "support": "Assistance",
+    "language": "Langue",
+    "signOut": "Se déconnecter"
+  },
+  "notFound": {
+    "error": "ERREUR",
+    "message": "Nous ne trouvons pas la page que vous recherchez.",
+    "backHome": "Retour à l'accueil"
+  }
+}

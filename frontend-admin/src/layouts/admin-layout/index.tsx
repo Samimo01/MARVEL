@@ -1,0 +1,27 @@
+import AppHeader from "@/layouts/admin-layout/header";
+import AppSidebar from "@/layouts/admin-layout/sidebar";
+import { ScrollToTop } from "@/components/shared/scroll-to-top";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import React from "react";
+import { Outlet } from "react-router";
+
+export default function AppLayout({
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+
+      <SidebarInset>
+        <AppHeader />
+
+        <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+          {children ?? <Outlet />}
+        </div>
+      </SidebarInset>
+      <ScrollToTop />
+    </SidebarProvider>
+  );
+}

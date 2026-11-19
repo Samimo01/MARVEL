@@ -1,0 +1,27 @@
+﻿# Dependances Node.js
+node_modules/
+
+# Fichiers generes par Vite
+dist/
+.vite/
+
+# Tests et couverture
+coverage/
+
+# Git
+.git/
+.gitignore
+
+# Variables d'environnement
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Fichiers systeme
+.DS_Store
+Thumbs.db

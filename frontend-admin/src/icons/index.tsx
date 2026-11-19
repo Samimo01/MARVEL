@@ -152,7 +152,5 @@ export { VisaIcon } from "./visa";
 export { WhatsappIcon } from "./whatsapp";
 export { XAiIcon } from "./x-ai";
 export { XIcon } from "./x";
-export { default as DeFlagIcon } from "./flag-de.svg?react";
-export { default as EsFlagIcon } from "./flag-es.svg?react";
 export { default as SaFlagIcon } from "./flag-sa.svg?react";
 export { default as UsFlagIcon } from "./flag-us.svg?react";

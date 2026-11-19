@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/contexts/theme-context";
+import { useTheme } from "@/app/providers/theme-provider";
 import { MoonIcon, SunIcon } from "@/icons";
 
 export default function ThemeToggleButton() {

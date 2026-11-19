@@ -1,5 +1,5 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeProvider } from "@/contexts";
+import { ThemeProvider } from "@/app/providers";
 import { I18nProvider } from "@/i18n";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
