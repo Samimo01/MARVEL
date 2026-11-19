@@ -1,4 +1,4 @@
-import { config } from './config.ts'
+import { config } from '@/lib/config.ts'
 
 /** Préfixe commun de toutes les routes de l'API (versionnée). */
 export const API_PREFIX = '/api/v1'

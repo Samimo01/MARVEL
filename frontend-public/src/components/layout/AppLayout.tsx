@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 
-import Footer from './Footer.tsx'
-import Header, { type NavItem } from './Header.tsx'
-import PageContainer from './PageContainer.tsx'
+import Footer from '@/components/layout/Footer.tsx'
+import Header, { type NavItem } from '@/components/layout/Header.tsx'
+import PageContainer from '@/components/layout/PageContainer.tsx'
 
 type AppLayoutProps = {
   title: string

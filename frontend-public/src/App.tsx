@@ -1,8 +1,8 @@
 import { Route, Routes } from 'react-router-dom'
 
-import CampaignsPage from './pages/CampaignsPage.tsx'
-import HomePage from './pages/HomePage.tsx'
-import NotFoundPage from './pages/NotFoundPage.tsx'
+import CampaignsPage from '@/pages/CampaignsPage.tsx'
+import HomePage from '@/pages/HomePage.tsx'
+import NotFoundPage from '@/pages/NotFoundPage.tsx'
 
 export default function App() {
   return (

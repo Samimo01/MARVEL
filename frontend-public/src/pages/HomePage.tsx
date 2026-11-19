@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 
-import CampaignList from '../features/campaigns/components/CampaignList.tsx'
-import PublicLayout from './PublicLayout.tsx'
+import CampaignList from '@/features/campaigns/components/CampaignList.tsx'
+import PublicLayout from '@/pages/PublicLayout.tsx'
 
 export default function HomePage() {
   return (

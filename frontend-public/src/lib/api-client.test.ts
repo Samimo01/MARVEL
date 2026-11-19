@@ -1,4 +1,4 @@
-import { ApiError, apiGet } from './api-client.ts'
+import { ApiError, apiGet } from '@/lib/api-client.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 

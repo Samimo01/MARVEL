@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import Button from './Button.tsx'
+import Button from '@/components/ui/Button.tsx'
 
 describe('Button', () => {
   it('signale le clic par un callback', async () => {
