@@ -4,7 +4,9 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.image_utils import convert_image_to_webp
 from app.core.security import create_access_token, hash_password, verify_password
+from app.core.supabase_client import USERS_BUCKET, supabase_admin
 from app.modules.auth import repository
 from app.modules.auth.models import Role, RoleAssignment, User
 from app.modules.auth.schemas import (
@@ -50,7 +52,12 @@ def authenticate_user(session: Session, payload: LoginRequest) -> str:
     return create_access_token(str(user.id_user))
 
 
-def register_user(session: Session, payload: RegistrationRequest) -> tuple[User, str]:
+def register_user(
+    session: Session,
+    payload: RegistrationRequest,
+    *,
+    image_bytes: bytes | None = None,
+) -> tuple[User, str]:
     email = str(payload.email).strip().lower()
 
     try:
@@ -67,6 +74,12 @@ def register_user(session: Session, payload: RegistrationRequest) -> tuple[User,
         )
         repository.add_user(session, user)
         access_token = create_access_token(str(user.id_user))
+        if image_bytes is not None:
+            user.image_url = _upload_user_image(
+                user.id_user,
+                image_bytes,
+                replace=False,
+            )
         session.commit()
         session.refresh(user)
         return user, access_token

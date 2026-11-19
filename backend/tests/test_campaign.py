@@ -56,7 +56,7 @@ def campaigns_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClie
 def _register_test_user(client: TestClient, email: str) -> tuple[UUID, str]:
     response = client.post(
         "/api/v1/auth/register",
-        json={
+        data={
             "firstname": "Ada", "lastname": "Lovelace",
             "email": email, "password": "a-very-strong-password", "tel": "0612345678",
         },

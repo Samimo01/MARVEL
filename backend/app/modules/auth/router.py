@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_administrator
@@ -51,15 +51,36 @@ def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
     response_model=RegistrationResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def register(payload: RegistrationRequest, db: DbSession) -> RegistrationResponse:
+async def register(
+    payload: Annotated[RegistrationRequest, Form()],
+    db: DbSession,
+    image: Annotated[
+        UploadFile | None,
+        File(description="Photo de profil facultative"),
+    ] = None,
+) -> RegistrationResponse:
+    image_bytes = None
+    if image is not None:
+        if image.content_type is None or not image.content_type.startswith("image/"):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Le fichier fourni n'est pas une image.",
+            )
+        image_bytes = await image.read()
+
     try:
-        user, access_token = service.register_user(db, payload)
+        user, access_token = service.register_user(
+            db,
+            payload,
+            image_bytes=image_bytes,
+        )
     except DuplicateAccountError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return RegistrationResponse(
         message="Compte créé.",
         id_user=user.id_user,
         nickname=user.nickname,
+        image_url=user.image_url,
         access_token=access_token,
     )
 

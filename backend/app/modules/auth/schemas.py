@@ -38,6 +38,7 @@ class RegistrationResponse(BaseModel):
     message: str
     id_user: UUID
     nickname: str | None = None
+    image_url: str | None = None
     access_token: str
     token_type: str = "bearer"
 

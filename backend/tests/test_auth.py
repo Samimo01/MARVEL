@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from unittest.mock import patch
 from uuid import UUID
 
 import jwt
@@ -55,7 +56,7 @@ def test_registration_creates_user_and_returns_access_token(auth_client) -> None
     client, test_session = auth_client
     response = client.post(
         "/api/v1/auth/register",
-        json={
+        data={
             "firstname": "Ada",
             "lastname": "Lovelace",
             "email": "Ada@example.com",
@@ -67,6 +68,7 @@ def test_registration_creates_user_and_returns_access_token(auth_client) -> None
     assert response.status_code == 201
     assert response.json()["message"] == "Compte créé."
     assert response.json()["id_user"]
+    assert response.json()["image_url"] is None
     assert response.json()["token_type"] == "bearer"
     claims = jwt.decode(
         response.json()["access_token"],
@@ -94,7 +96,7 @@ def test_registration_rejects_a_weak_jwt_secret(auth_client, monkeypatch) -> Non
     }
 
     with pytest.raises(RuntimeError, match="32 octets"):
-        client.post("/api/v1/auth/register", json=payload)
+        client.post("/api/v1/auth/register", data=payload)
 
     with test_session() as session:
         assert session.scalar(select(User)) is None
@@ -110,10 +112,10 @@ def test_registration_rejects_duplicate_email(auth_client) -> None:
         "tel": "0612345678",
     }
 
-    created = client.post("/api/v1/auth/register", json=payload)
+    created = client.post("/api/v1/auth/register", data=payload)
     duplicate = client.post(
         "/api/v1/auth/register",
-        json=payload,
+        data=payload,
     )
 
     assert created.status_code == 201
@@ -126,7 +128,7 @@ def test_login_returns_a_persistent_access_token_for_valid_credentials(auth_clie
     client, _ = auth_client
     registration = client.post(
         "/api/v1/auth/register",
-        json={
+        data={
             "firstname": "Ada",
             "lastname": "Lovelace",
             "email": "Ada@example.com",
@@ -159,7 +161,7 @@ def test_login_rejects_invalid_credentials_with_the_same_response(auth_client) -
     client, _ = auth_client
     client.post(
         "/api/v1/auth/register",
-        json={
+        data={
             "firstname": "Ada",
             "lastname": "Lovelace",
             "email": "ada@example.com",
@@ -226,7 +228,7 @@ def test_unassigned_user_cannot_close_a_campaign(auth_client) -> None:
     client, _ = auth_client
     registration = client.post(
         "/api/v1/auth/register",
-        json={
+        data={
             "firstname": "Ada",
             "lastname": "Lovelace",
             "email": "ada@example.com",
@@ -246,7 +248,7 @@ def test_unassigned_user_cannot_close_a_campaign(auth_client) -> None:
 def _register_test_user(client: TestClient, email: str) -> tuple[UUID, str]:
     response = client.post(
         "/api/v1/auth/register",
-        json={
+        data={
             "firstname": "Ada",
             "lastname": "Lovelace",
             "email": email,
@@ -347,97 +349,105 @@ def test_administrator_cannot_revoke_the_last_administrator(auth_client) -> None
 
     assert response.status_code == 409
 
-from unittest.mock import patch
-from app.modules.auth.models import User
-
 # ============================================================
-# AUT-09 et AUT-10 : images utilisateur
+# Image utilisateur à l'inscription et modification ultérieure
 # ============================================================
 
 @patch("app.modules.auth.service.convert_image_to_webp")
 @patch("app.modules.auth.service.supabase_admin")
-def test_aut09_upload_user_image_public(
+def test_registration_uploads_optional_profile_image(
     mock_supabase, mock_convert, auth_client,
 ) -> None:
-    """AUT-09 : Upload public de la photo d'un utilisateur."""
+    """L'inscription accepte une photo facultative et retourne son URL."""
     client, test_session = auth_client
-    res = client.post(
-        "/api/v1/auth/register",
-        json={
-            "firstname": "Jane", "lastname": "Doe",
-            "email": "jane@example.com", "password": "a-very-strong-password",
-            "tel": "0612345678",
-        },
-    )
-    assert res.status_code == 201
-    user_id = UUID(res.json()["id_user"])
-
     mock_convert.return_value = b"fake_webp"
     fake_url = "https://mock.supabase.co/storage/v1/object/public/users/avatar.webp"
     mock_supabase.storage.from_().get_public_url.return_value = fake_url
 
     response = client.post(
-        f"/api/v1/auth/{user_id}/image",
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Jane",
+            "lastname": "Doe",
+            "email": "jane@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
         files={"image": ("avatar.png", b"fake_png", "image/png")},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json()["image_url"] == fake_url
+    user_id = UUID(response.json()["id_user"])
+    mock_supabase.storage.from_().upload.assert_called_once_with(
+        path=f"{user_id}/avatar.webp",
+        file=b"fake_webp",
+        file_options={
+            "content-type": "image/webp",
+            "upsert": "false",
+        },
+    )
 
     with test_session() as session:
         user = session.get(User, user_id)
         assert user.image_url == fake_url
 
 
-@patch("app.modules.auth.service.convert_image_to_webp")
 @patch("app.modules.auth.service.supabase_admin")
-def test_aut09_fails_if_image_exists(
-    mock_supabase, mock_convert, auth_client,
+@patch("app.modules.auth.service.convert_image_to_webp")
+def test_registration_does_not_create_user_when_avatar_upload_fails(
+    mock_convert, mock_supabase, auth_client,
 ) -> None:
-    """AUT-09 : 409 si l'utilisateur a déjà une image."""
     client, test_session = auth_client
-    res = client.post(
-        "/api/v1/auth/register",
-        json={
-            "firstname": "Jane", "lastname": "Doe",
-            "email": "jane2@example.com", "password": "a-very-strong-password",
-            "tel": "0612345678",
-        },
-    )
-    user_id = UUID(res.json()["id_user"])
+    mock_convert.return_value = b"fake_webp"
+    mock_supabase.storage.from_().upload.side_effect = RuntimeError("Storage unavailable")
+
+    with pytest.raises(RuntimeError, match="Storage unavailable"):
+        client.post(
+            "/api/v1/auth/register",
+            data={
+                "firstname": "Jane",
+                "lastname": "Doe",
+                "email": "jane-storage-error@example.com",
+                "password": "a-very-strong-password",
+                "tel": "0612345678",
+            },
+            files={"image": ("avatar.png", b"fake_png", "image/png")},
+        )
 
     with test_session() as session:
-        user = session.get(User, user_id)
-        user.image_url = "https://existing.url/avatar.webp"
-        session.commit()
-
-    response = client.post(
-        f"/api/v1/auth/{user_id}/image",
-        files={"image": ("avatar.png", b"fake", "image/png")},
-    )
-
-    assert response.status_code == 409
+        assert session.scalar(select(User)) is None
 
 
 def test_aut09_rejects_non_image(auth_client) -> None:
-    """AUT-09 : 400 si le fichier n'est pas une image."""
-    client, _ = auth_client
-    res = client.post(
+    """L'inscription refuse un fichier qui n'est pas une image."""
+    client, test_session = auth_client
+    response = client.post(
         "/api/v1/auth/register",
-        json={
-            "firstname": "Jane", "lastname": "Doe",
-            "email": "jane3@example.com", "password": "a-very-strong-password",
+        data={
+            "firstname": "Jane",
+            "lastname": "Doe",
+            "email": "jane3@example.com",
+            "password": "a-very-strong-password",
             "tel": "0612345678",
         },
-    )
-    user_id = UUID(res.json()["id_user"])
-
-    response = client.post(
-        f"/api/v1/auth/{user_id}/image",
         files={"image": ("doc.txt", b"not_an_image", "text/plain")},
     )
 
     assert response.status_code == 400
+    with test_session() as session:
+        assert session.scalar(select(User)) is None
+
+
+def test_public_user_image_route_is_removed(auth_client) -> None:
+    client, _ = auth_client
+
+    response = client.post(
+        "/api/v1/auth/00000000-0000-0000-0000-000000000001/image",
+        files={"image": ("avatar.png", b"fake_png", "image/png")},
+    )
+
+    assert response.status_code == 404
 
 
 @patch("app.modules.auth.service.convert_image_to_webp")
@@ -449,7 +459,7 @@ def test_aut10_user_can_replace_own_image(
     client, test_session = auth_client
     res = client.post(
         "/api/v1/auth/register",
-        json={
+        data={
             "firstname": "Jane", "lastname": "Doe",
             "email": "jane4@example.com", "password": "a-very-strong-password",
             "tel": "0612345678",
@@ -476,7 +486,7 @@ def test_aut10_rejects_other_user(auth_client) -> None:
     """AUT-10 : 403 si un utilisateur modifie la photo d'un autre."""
     client, _ = auth_client
 
-    res1 = client.post("/api/v1/auth/register", json={
+    res1 = client.post("/api/v1/auth/register", data={
         "firstname": "Alice",   # 👈 était "A" (1 char → 422)
         "lastname": "One",
         "email": "user1@example.com",
@@ -486,7 +496,7 @@ def test_aut10_rejects_other_user(auth_client) -> None:
     assert res1.status_code == 201  # 👈 vérifie le statut avant .json()
     token1 = res1.json()["access_token"]
 
-    res2 = client.post("/api/v1/auth/register", json={
+    res2 = client.post("/api/v1/auth/register", data={
         "firstname": "Bob",     # 👈 était "B" (1 char → 422)
         "lastname": "Two",
         "email": "user2@example.com",
