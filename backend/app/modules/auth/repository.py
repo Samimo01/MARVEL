@@ -9,6 +9,8 @@ from app.modules.auth.models import Role, RoleAssignment, User
 def get_user_by_email(session: Session, email: str) -> User | None:
     return session.scalar(select(User).where(func.lower(User.email) == email.lower()))
 
+def get_user_by_id(session: Session, id_user: UUID) -> User | None:
+    return session.get(User, id_user)
 
 def add_user(session: Session, user: User) -> None:
     session.add(user)

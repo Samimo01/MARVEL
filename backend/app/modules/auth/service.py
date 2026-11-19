@@ -15,7 +15,8 @@ from app.modules.auth.schemas import (
     RoleAssignmentStatus,
     RoleName,
 )
-
+from app.core.supabase_client import USERS_BUCKET, supabase_admin
+from app.core.image_utils import convert_image_to_webp
 
 class DuplicateAccountError(ValueError):
     pass
@@ -171,3 +172,103 @@ def set_user_role_assignment(
         assignment_type=payload.assignment_type,
         created_at=assignment.created_at,
     )
+
+# ============================================================
+# Exceptions images
+# ============================================================
+class UserNotFoundError(LookupError):
+    pass
+
+class ImageAlreadyExistsError(ValueError):
+    pass
+
+class UnauthorizedImageActionError(PermissionError):
+    pass
+
+
+# ============================================================
+# Helper interne
+# ============================================================
+def _upload_user_image(
+    id_user: UUID,
+    image_bytes: bytes,
+    *,
+    replace: bool = False,
+) -> str:
+    """Convertit en WebP, upload vers Supabase, retourne l'URL publique."""
+    webp_bytes = convert_image_to_webp(image_bytes, quality=85, max_width=800)
+    path = f"{id_user}/avatar.webp"
+
+    supabase_admin.storage.from_(USERS_BUCKET).upload(
+        path=path,
+        file=webp_bytes,
+        file_options={
+            "content-type": "image/webp",
+            "upsert": "true" if replace else "false",
+        },
+    )
+    return supabase_admin.storage.from_(USERS_BUCKET).get_public_url(path)
+
+
+def _is_administrator(session: Session, user_id: UUID) -> bool:
+    """Vérifie si l'utilisateur a un rôle Administrator actif."""
+    assignment = repository.get_latest_role_assignment(
+        session, user_id, "Administrator"
+    )
+    return assignment is not None and assignment.assignment_type == "assigned"
+
+
+# ============================================================
+# AUT-09 : Upload public (pendant l'inscription)
+# ============================================================
+def upload_user_image(
+    session: Session,
+    *,
+    id_user: UUID,
+    image_bytes: bytes,
+) -> User:
+    """AUT-09 : Upload public de la photo d'un utilisateur (avant connexion)."""
+    user = repository.get_user_by_id(session, id_user)
+    if user is None:
+        raise UserNotFoundError(f"Utilisateur {id_user} introuvable.")
+
+    if user.image_url:
+        raise ImageAlreadyExistsError(
+            "Une image existe déjà. Utilisez PATCH /users/{id}/image."
+        )
+
+    url = _upload_user_image(id_user, image_bytes, replace=False)
+    user.image_url = url
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+# ============================================================
+# AUT-10 : Remplacement authentifié (self ou admin)
+# ============================================================
+def replace_user_image(
+    session: Session,
+    *,
+    current_user: User,
+    id_user: UUID,
+    image_bytes: bytes,
+) -> User:
+    """AUT-10 : Remplace la photo d'un utilisateur (self ou admin)."""
+    target = repository.get_user_by_id(session, id_user)
+    if target is None:
+        raise UserNotFoundError(f"Utilisateur {id_user} introuvable.")
+
+    is_self = current_user.id_user == target.id_user
+    is_admin = _is_administrator(session, current_user.id_user)
+
+    if not is_self and not is_admin:
+        raise UnauthorizedImageActionError(
+            "Vous ne pouvez remplacer que votre propre photo."
+        )
+
+    url = _upload_user_image(id_user, image_bytes, replace=True)
+    target.image_url = url
+    session.commit()
+    session.refresh(target)
+    return target
