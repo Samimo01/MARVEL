@@ -70,7 +70,7 @@ def natural_client(
 def _register_test_user(client: TestClient, email: str) -> tuple[UUID, str]:
     response = client.post(
         "/api/v1/auth/register",
-        json={
+        data={
             "firstname": "User", "lastname": "Test",
             "email": email, "password": "a-very-strong-password",
             "tel": "0612345678",

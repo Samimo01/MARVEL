@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_administrator
@@ -23,11 +23,10 @@ from app.modules.auth.service import (
     DuplicateAccountError,
     InvalidCredentialsError,
     ManagedUserNotFoundError,
-    ImageAlreadyExistsError,
     UnauthorizedImageActionError,
     UserNotFoundError,
 )
-from fastapi import File, UploadFile
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 admin_router = APIRouter(prefix="/admin", tags=["admin roles"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -51,15 +50,36 @@ def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
     response_model=RegistrationResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def register(payload: RegistrationRequest, db: DbSession) -> RegistrationResponse:
+async def register(
+    payload: Annotated[RegistrationRequest, Form()],
+    db: DbSession,
+    image: Annotated[
+        UploadFile | None,
+        File(description="Photo de profil facultative"),
+    ] = None,
+) -> RegistrationResponse:
+    image_bytes = None
+    if image is not None:
+        if image.content_type is None or not image.content_type.startswith("image/"):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Le fichier fourni n'est pas une image.",
+            )
+        image_bytes = await image.read()
+
     try:
-        user, access_token = service.register_user(db, payload)
+        user, access_token = service.register_user(
+            db,
+            payload,
+            image_bytes=image_bytes,
+        )
     except DuplicateAccountError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return RegistrationResponse(
         message="Compte créé.",
         id_user=user.id_user,
         nickname=user.nickname,
+        image_url=user.image_url,
         access_token=access_token,
     )
 
@@ -105,33 +125,7 @@ def set_user_role(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 # ============================================================
-# AUT-09 : POST /auth/{id_user}/image (public)
-# ============================================================
-@router.post("/{id_user}/image", response_model=UserOut)
-async def aut09_upload_user_image(
-    id_user: UUID,
-    image: UploadFile = File(..., description="Photo de profil"),
-    db: DbSession = None,
-) -> UserOut:
-    """AUT-09 : Upload public de la photo d'un utilisateur."""
-    if not image.content_type.startswith("image/"):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            "Le fichier fourni n'est pas une image.",
-        )
-
-    image_bytes = await image.read()
-    try:
-        user = service.upload_user_image(db, id_user=id_user, image_bytes=image_bytes)
-        return UserOut.model_validate(user)
-    except UserNotFoundError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
-    except ImageAlreadyExistsError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-
-
-# ============================================================
-# AUT-10 : PATCH /users/{id_user}/image (authentifié)
+# PATCH /users/{id_user}/image (authentifié)
 # ============================================================
 @users_router.patch("/{id_user}/image", response_model=UserOut)
 async def aut10_replace_user_image(

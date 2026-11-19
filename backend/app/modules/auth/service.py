@@ -4,7 +4,9 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.image_utils import convert_image_to_webp
 from app.core.security import create_access_token, hash_password, verify_password
+from app.core.supabase_client import USERS_BUCKET, supabase_admin
 from app.modules.auth import repository
 from app.modules.auth.models import Role, RoleAssignment, User
 from app.modules.auth.schemas import (
@@ -15,8 +17,7 @@ from app.modules.auth.schemas import (
     RoleAssignmentStatus,
     RoleName,
 )
-from app.core.supabase_client import USERS_BUCKET, supabase_admin
-from app.core.image_utils import convert_image_to_webp
+
 
 class DuplicateAccountError(ValueError):
     pass
@@ -50,7 +51,12 @@ def authenticate_user(session: Session, payload: LoginRequest) -> str:
     return create_access_token(str(user.id_user))
 
 
-def register_user(session: Session, payload: RegistrationRequest) -> tuple[User, str]:
+def register_user(
+    session: Session,
+    payload: RegistrationRequest,
+    *,
+    image_bytes: bytes | None = None,
+) -> tuple[User, str]:
     email = str(payload.email).strip().lower()
 
     try:
@@ -67,6 +73,12 @@ def register_user(session: Session, payload: RegistrationRequest) -> tuple[User,
         )
         repository.add_user(session, user)
         access_token = create_access_token(str(user.id_user))
+        if image_bytes is not None:
+            user.image_url = _upload_user_image(
+                user.id_user,
+                image_bytes,
+                replace=False,
+            )
         session.commit()
         session.refresh(user)
         return user, access_token
@@ -179,9 +191,6 @@ def set_user_role_assignment(
 class UserNotFoundError(LookupError):
     pass
 
-class ImageAlreadyExistsError(ValueError):
-    pass
-
 class UnauthorizedImageActionError(PermissionError):
     pass
 
@@ -219,33 +228,7 @@ def _is_administrator(session: Session, user_id: UUID) -> bool:
 
 
 # ============================================================
-# AUT-09 : Upload public (pendant l'inscription)
-# ============================================================
-def upload_user_image(
-    session: Session,
-    *,
-    id_user: UUID,
-    image_bytes: bytes,
-) -> User:
-    """AUT-09 : Upload public de la photo d'un utilisateur (avant connexion)."""
-    user = repository.get_user_by_id(session, id_user)
-    if user is None:
-        raise UserNotFoundError(f"Utilisateur {id_user} introuvable.")
-
-    if user.image_url:
-        raise ImageAlreadyExistsError(
-            "Une image existe déjà. Utilisez PATCH /users/{id}/image."
-        )
-
-    url = _upload_user_image(id_user, image_bytes, replace=False)
-    user.image_url = url
-    session.commit()
-    session.refresh(user)
-    return user
-
-
-# ============================================================
-# AUT-10 : Remplacement authentifié (self ou admin)
+# Remplacement authentifié (self ou admin)
 # ============================================================
 def replace_user_image(
     session: Session,
