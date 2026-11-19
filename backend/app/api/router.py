@@ -4,6 +4,8 @@ from fastapi import APIRouter
 from app.api import health, public
 from app.modules.auth.router import admin_router as auth_admin_router
 from app.modules.auth.router import router as auth_router
+from app.modules.auth.router import users_router
+
 from app.modules.beneficiaries.router import router as beneficiaries_router
 from app.modules.budget.router import router as budget_router
 from app.modules.campaigns.router import (
@@ -39,5 +41,6 @@ for module_router in (
     budget_router,
     volunteers_router,
     dashboard_router,
+    users_router,
 ):
     api_router.include_router(module_router)
