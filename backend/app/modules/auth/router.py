@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import require_administrator
+from app.core.dependencies import get_current_user, require_administrator
 from app.database import get_db
 from app.modules.auth import service
 from app.modules.auth.models import User
@@ -16,18 +16,22 @@ from app.modules.auth.schemas import (
     RoleAssignmentResponse,
     RoleName,
     TokenResponse,
+    UserOut,
 )
 from app.modules.auth.service import (
     CannotRevokeLastAdministratorError,
     DuplicateAccountError,
     InvalidCredentialsError,
     ManagedUserNotFoundError,
+    ImageAlreadyExistsError,
+    UnauthorizedImageActionError,
+    UserNotFoundError,
 )
-
+from fastapi import File, UploadFile
 router = APIRouter(prefix="/auth", tags=["auth"])
 admin_router = APIRouter(prefix="/admin", tags=["admin roles"])
 DbSession = Annotated[Session, Depends(get_db)]
-
+users_router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
@@ -99,3 +103,60 @@ def set_user_role(
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except CannotRevokeLastAdministratorError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+# ============================================================
+# AUT-09 : POST /auth/{id_user}/image (public)
+# ============================================================
+@router.post("/{id_user}/image", response_model=UserOut)
+async def aut09_upload_user_image(
+    id_user: UUID,
+    image: UploadFile = File(..., description="Photo de profil"),
+    db: DbSession = None,
+) -> UserOut:
+    """AUT-09 : Upload public de la photo d'un utilisateur."""
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
+
+    image_bytes = await image.read()
+    try:
+        user = service.upload_user_image(db, id_user=id_user, image_bytes=image_bytes)
+        return UserOut.model_validate(user)
+    except UserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ImageAlreadyExistsError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+
+# ============================================================
+# AUT-10 : PATCH /users/{id_user}/image (authentifié)
+# ============================================================
+@users_router.patch("/{id_user}/image", response_model=UserOut)
+async def aut10_replace_user_image(
+    id_user: UUID,
+    image: UploadFile = File(..., description="Nouvelle photo de profil"),
+    db: DbSession = None,
+    current_user: User = Depends(get_current_user),
+) -> UserOut:
+    """AUT-10 : Remplace la photo d'un utilisateur."""
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
+
+    image_bytes = await image.read()
+    try:
+        user = service.replace_user_image(
+            db,
+            current_user=current_user,
+            id_user=id_user,
+            image_bytes=image_bytes,
+        )
+        return UserOut.model_validate(user)
+    except UserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except UnauthorizedImageActionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc

@@ -346,3 +346,160 @@ def test_administrator_cannot_revoke_the_last_administrator(auth_client) -> None
     )
 
     assert response.status_code == 409
+
+from unittest.mock import patch
+from app.modules.auth.models import User
+
+# ============================================================
+# AUT-09 et AUT-10 : images utilisateur
+# ============================================================
+
+@patch("app.modules.auth.service.convert_image_to_webp")
+@patch("app.modules.auth.service.supabase_admin")
+def test_aut09_upload_user_image_public(
+    mock_supabase, mock_convert, auth_client,
+) -> None:
+    """AUT-09 : Upload public de la photo d'un utilisateur."""
+    client, test_session = auth_client
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "firstname": "Jane", "lastname": "Doe",
+            "email": "jane@example.com", "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    assert res.status_code == 201
+    user_id = UUID(res.json()["id_user"])
+
+    mock_convert.return_value = b"fake_webp"
+    fake_url = "https://mock.supabase.co/storage/v1/object/public/users/avatar.webp"
+    mock_supabase.storage.from_().get_public_url.return_value = fake_url
+
+    response = client.post(
+        f"/api/v1/auth/{user_id}/image",
+        files={"image": ("avatar.png", b"fake_png", "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["image_url"] == fake_url
+
+    with test_session() as session:
+        user = session.get(User, user_id)
+        assert user.image_url == fake_url
+
+
+@patch("app.modules.auth.service.convert_image_to_webp")
+@patch("app.modules.auth.service.supabase_admin")
+def test_aut09_fails_if_image_exists(
+    mock_supabase, mock_convert, auth_client,
+) -> None:
+    """AUT-09 : 409 si l'utilisateur a déjà une image."""
+    client, test_session = auth_client
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "firstname": "Jane", "lastname": "Doe",
+            "email": "jane2@example.com", "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    user_id = UUID(res.json()["id_user"])
+
+    with test_session() as session:
+        user = session.get(User, user_id)
+        user.image_url = "https://existing.url/avatar.webp"
+        session.commit()
+
+    response = client.post(
+        f"/api/v1/auth/{user_id}/image",
+        files={"image": ("avatar.png", b"fake", "image/png")},
+    )
+
+    assert response.status_code == 409
+
+
+def test_aut09_rejects_non_image(auth_client) -> None:
+    """AUT-09 : 400 si le fichier n'est pas une image."""
+    client, _ = auth_client
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "firstname": "Jane", "lastname": "Doe",
+            "email": "jane3@example.com", "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    user_id = UUID(res.json()["id_user"])
+
+    response = client.post(
+        f"/api/v1/auth/{user_id}/image",
+        files={"image": ("doc.txt", b"not_an_image", "text/plain")},
+    )
+
+    assert response.status_code == 400
+
+
+@patch("app.modules.auth.service.convert_image_to_webp")
+@patch("app.modules.auth.service.supabase_admin")
+def test_aut10_user_can_replace_own_image(
+    mock_supabase, mock_convert, auth_client,
+) -> None:
+    """AUT-10 : L'utilisateur peut remplacer sa propre photo."""
+    client, test_session = auth_client
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "firstname": "Jane", "lastname": "Doe",
+            "email": "jane4@example.com", "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    user_id = UUID(res.json()["id_user"])
+    token = res.json()["access_token"]
+
+    mock_convert.return_value = b"fake_webp"
+    new_url = "https://mock.supabase.co/storage/v1/object/public/users/new.webp"
+    mock_supabase.storage.from_().get_public_url.return_value = new_url
+
+    response = client.patch(
+        f"/api/v1/users/{user_id}/image",
+        files={"image": ("avatar.png", b"fake_png", "image/png")},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["image_url"] == new_url
+
+
+def test_aut10_rejects_other_user(auth_client) -> None:
+    """AUT-10 : 403 si un utilisateur modifie la photo d'un autre."""
+    client, _ = auth_client
+
+    res1 = client.post("/api/v1/auth/register", json={
+        "firstname": "Alice",   # 👈 était "A" (1 char → 422)
+        "lastname": "One",
+        "email": "user1@example.com",
+        "password": "a-very-strong-password",
+        "tel": "0600000001",
+    })
+    assert res1.status_code == 201  # 👈 vérifie le statut avant .json()
+    token1 = res1.json()["access_token"]
+
+    res2 = client.post("/api/v1/auth/register", json={
+        "firstname": "Bob",     # 👈 était "B" (1 char → 422)
+        "lastname": "Two",
+        "email": "user2@example.com",
+        "password": "a-very-strong-password",
+        "tel": "0600000002",
+    })
+    assert res2.status_code == 201
+    user2_id = UUID(res2.json()["id_user"])
+
+    response = client.patch(
+        f"/api/v1/users/{user2_id}/image",
+        files={"image": ("avatar.png", b"fake", "image/png")},
+        headers={"Authorization": f"Bearer {token1}"},
+    )
+
+    assert response.status_code == 403
