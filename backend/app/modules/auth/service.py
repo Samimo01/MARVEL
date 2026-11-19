@@ -1,14 +1,21 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.image_utils import convert_image_to_webp
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    decode_token,
+    hash_password,
+    token_revocation_id,
+    verify_password,
+)
 from app.core.supabase_client import USERS_BUCKET, supabase_admin
 from app.modules.auth import repository
-from app.modules.auth.models import Role, RoleAssignment, User
+from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.auth.schemas import (
     LoginRequest,
     RegistrationRequest,
@@ -17,8 +24,7 @@ from app.modules.auth.schemas import (
     RoleAssignmentStatus,
     RoleName,
 )
-from app.core.supabase_client import USERS_BUCKET, supabase_admin
-from app.core.image_utils import convert_image_to_webp
+
 
 class DuplicateAccountError(ValueError):
     pass
@@ -50,6 +56,27 @@ def authenticate_user(session: Session, payload: LoginRequest) -> str:
         raise InvalidCredentialsError("E-mail ou mot de passe incorrect.")
 
     return create_access_token(str(user.id_user))
+
+
+def revoke_access_token(session: Session, *, token: str, user_id: UUID) -> None:
+    payload = decode_token(token)
+    if payload.get("sub") != str(user_id):
+        raise InvalidCredentialsError("Token invalide.")
+
+    expires_at = payload.get("exp")
+    if not isinstance(expires_at, (int, float)):
+        raise InvalidCredentialsError("Le token n'a pas de date d'expiration valide.")
+
+    now = datetime.now(UTC)
+    session.execute(delete(RevokedToken).where(RevokedToken.expires_at <= now))
+    session.add(
+        RevokedToken(
+            token_id=token_revocation_id(token, payload),
+            id_user=user_id,
+            expires_at=datetime.fromtimestamp(expires_at, UTC),
+        )
+    )
+    session.commit()
 
 
 def register_user(

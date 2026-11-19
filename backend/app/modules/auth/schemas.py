@@ -53,6 +53,10 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class LogoutResponse(BaseModel):
+    message: str
+
+
 class RoleName(StrEnum):
     VOLUNTEER = "Volunteer"
     COLLECTION_MANAGER = "Collection_Manager"

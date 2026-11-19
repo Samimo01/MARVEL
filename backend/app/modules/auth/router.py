@@ -2,14 +2,16 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_administrator
+from app.core.dependencies import get_current_user, require_administrator, security
 from app.database import get_db
 from app.modules.auth import service
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     LoginRequest,
+    LogoutResponse,
     RegistrationRequest,
     RegistrationResponse,
     RoleAssignmentRequest,
@@ -21,13 +23,13 @@ from app.modules.auth.schemas import (
 from app.modules.auth.service import (
     CannotRevokeLastAdministratorError,
     DuplicateAccountError,
+    ImageAlreadyExistsError,
     InvalidCredentialsError,
     ManagedUserNotFoundError,
-    ImageAlreadyExistsError,
     UnauthorizedImageActionError,
     UserNotFoundError,
 )
-from fastapi import File, UploadFile
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 admin_router = APIRouter(prefix="/admin", tags=["admin roles"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -44,6 +46,20 @@ def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     return TokenResponse(access_token=access_token)
+
+
+@router.post("/logout", response_model=LogoutResponse)
+def logout(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    db: DbSession,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> LogoutResponse:
+    service.revoke_access_token(
+        db,
+        token=credentials.credentials,
+        user_id=current_user.id_user,
+    )
+    return LogoutResponse(message="Déconnexion réussie.")
 
 
 @router.post(

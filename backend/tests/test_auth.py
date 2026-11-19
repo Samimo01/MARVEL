@@ -14,7 +14,7 @@ from app.config import settings
 from app.core.dependencies import require_campaign_editor
 from app.database import Base, get_db
 from app.main import app
-from app.modules.auth.models import Role, RoleAssignment, User
+from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 
 
 @pytest.fixture()
@@ -32,7 +32,12 @@ def auth_client(
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    auth_tables = [User.__table__, Role.__table__, RoleAssignment.__table__]
+    auth_tables = [
+        User.__table__,
+        Role.__table__,
+        RoleAssignment.__table__,
+        RevokedToken.__table__,
+    ]
     Base.metadata.create_all(engine, tables=auth_tables)
     test_session = sessionmaker(bind=engine, autoflush=False)
     monkeypatch.setattr("app.main.SessionLocal", test_session)
@@ -182,6 +187,49 @@ def test_login_rejects_invalid_credentials_with_the_same_response(auth_client) -
     assert wrong_password.status_code == 401
     assert unknown_email.status_code == 401
     assert wrong_password.json() == unknown_email.json()
+
+
+def test_logout_revokes_only_the_current_token(auth_client) -> None:
+    client, test_session = auth_client
+    registration = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "logout@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    first_token = registration.json()["access_token"]
+    second_token = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "logout@example.com",
+            "password": "a-very-strong-password",
+        },
+    ).json()["access_token"]
+
+    logout_response = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {first_token}"},
+    )
+    repeated_logout = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {first_token}"},
+    )
+    other_session_logout = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {second_token}"},
+    )
+
+    assert logout_response.status_code == 200
+    assert logout_response.json() == {"message": "Déconnexion réussie."}
+    assert repeated_logout.status_code == 401
+    assert other_session_logout.status_code == 200
+
+    with test_session() as session:
+        assert len(session.scalars(select(RevokedToken)).all()) == 2
 
 
 @pytest.mark.parametrize(

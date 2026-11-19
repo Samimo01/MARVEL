@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
-from app.modules.auth.models import Role, RoleAssignment, User
+from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign
 from app.modules.natural_donations.models import (
     NaturalDon, NaturalDonItem, ObjectType,
@@ -40,7 +40,7 @@ def natural_client(
     )
 
     test_tables = [
-        User.__table__, Role.__table__, RoleAssignment.__table__,
+        User.__table__, Role.__table__, RoleAssignment.__table__, RevokedToken.__table__,
         Campaign.__table__, ObjectType.__table__,
         NaturalDon.__table__, NaturalDonItem.__table__,
     ]

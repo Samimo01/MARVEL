@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.modules.auth.models import Role, RoleAssignment, User
+from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 
 
 def get_user_by_email(session: Session, email: str) -> User | None:
@@ -11,6 +11,11 @@ def get_user_by_email(session: Session, email: str) -> User | None:
 
 def get_user_by_id(session: Session, id_user: UUID) -> User | None:
     return session.get(User, id_user)
+
+
+def is_token_revoked(session: Session, token_id: str) -> bool:
+    return session.get(RevokedToken, token_id) is not None
+
 
 def add_user(session: Session, user: User) -> None:
     session.add(user)

@@ -85,3 +85,19 @@ class RoleAssignment(Base):
         ForeignKey("users.id_user", ondelete="CASCADE"),
         nullable=False,
     )
+
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+
+    token_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    id_user: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id_user", ondelete="CASCADE"),
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )

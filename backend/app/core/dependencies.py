@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_token
+from app.core.security import decode_token, token_revocation_id
 from app.database import get_db
 from app.modules.auth import repository as auth_repo
 from app.modules.auth.models import User
@@ -23,6 +23,9 @@ def get_current_user(
     try:
         # Utilisation de la fonction centralisée dans security.py
         payload = decode_token(credentials.credentials)
+        token_id = token_revocation_id(credentials.credentials, payload)
+        if auth_repo.is_token_revoked(session, token_id):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token révoqué")
         
         user_id = payload.get("sub")
         if not isinstance(user_id, str) or not user_id:

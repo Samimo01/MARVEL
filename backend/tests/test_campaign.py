@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
-from app.modules.auth.models import Role, RoleAssignment, User
+from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign
 from app.modules.financial_donations.models import FinancialDon 
 from decimal import Decimal
@@ -29,7 +29,7 @@ def campaigns_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClie
     
     # 👇 AJOUT DE FinancialDon.__table__ DANS LA LISTE
     test_tables = [
-        User.__table__, Role.__table__, RoleAssignment.__table__, 
+        User.__table__, Role.__table__, RoleAssignment.__table__, RevokedToken.__table__,
         Campaign.__table__, FinancialDon.__table__
     ]
     Base.metadata.create_all(engine, tables=test_tables)
