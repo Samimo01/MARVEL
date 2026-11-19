@@ -203,3 +203,82 @@ def list_all_campaigns(
         session, status=status, start_at=start_at, finish_at=finish_at, limit=limit, offset=offset
     )
     return [CampaignOut.model_validate(c) for c in campaigns]
+
+
+from app.core.supabase_client import CAMPAIGNS_BUCKET, supabase_admin
+from app.core.image_utils import convert_image_to_webp
+
+
+def _upload_campaign_image(
+    id_campaign: UUID,
+    image_bytes: bytes,
+    *,
+    replace: bool = False,
+) -> str:
+    """Convertit en WebP, upload vers Supabase, retourne l'URL publique."""
+    # 1. Convertir l'image en WebP
+    webp_bytes = convert_image_to_webp(image_bytes)
+    
+    # 2. Définir le chemin dans le bucket
+    path = f"{id_campaign}/cover.webp"
+    
+    # 3. Upload (upsert=True si remplacement)
+    supabase_admin.storage.from_(CAMPAIGNS_BUCKET).upload(
+        path=path,
+        file=webp_bytes,
+        file_options={
+            "content-type": "image/webp",
+            "upsert": "true" if replace else "false",
+        },
+    )
+    
+    # 4. Récupérer et retourner l'URL publique
+    return supabase_admin.storage.from_(CAMPAIGNS_BUCKET).get_public_url(path)
+
+
+def upload_campaign_image(
+    session: Session,
+    *,
+    user: User,
+    id_campaign: UUID,
+    image_bytes: bytes,
+) -> CampaignOut:
+    """CAM-12 : Téléverse la photo d'une campagne."""
+    campaign = _get_or_raise(session, id_campaign)
+    
+    # Vérifier qu'aucune image n'existe déjà
+    if campaign.image_url:
+        raise InvalidStatusTransitionError(
+            "Une image existe déjà pour cette campagne. Utilisez PATCH pour la remplacer."
+        )
+    
+    # 👇 1. Upload vers Supabase et récupération de l'URL
+    url = _upload_campaign_image(id_campaign, image_bytes, replace=False)
+    
+    # 👇 2. SAUVEGARDE DANS LA BASE DE DONNÉES
+    campaign.image_url = url
+    session.commit()
+    session.refresh(campaign)
+    
+    return CampaignOut.model_validate(campaign)
+
+
+def replace_campaign_image(
+    session: Session,
+    *,
+    user: User,
+    id_campaign: UUID,
+    image_bytes: bytes,
+) -> CampaignOut:
+    """CAM-13 : Remplace l'image existante d'une campagne."""
+    campaign = _get_or_raise(session, id_campaign)
+    
+    # 👇 1. Upload avec replace=True (écrase l'ancienne image dans le bucket)
+    url = _upload_campaign_image(id_campaign, image_bytes, replace=True)
+    
+    # 👇 2. SAUVEGARDE DANS LA BASE DE DONNÉES
+    campaign.image_url = url
+    session.commit()
+    session.refresh(campaign)
+    
+    return CampaignOut.model_validate(campaign)

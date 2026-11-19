@@ -14,7 +14,7 @@ from app.modules.auth.models import Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign
 from app.modules.financial_donations.models import FinancialDon 
 from decimal import Decimal
-
+from unittest.mock import patch
 
 @pytest.fixture()
 def campaigns_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
@@ -157,3 +157,171 @@ def test_get_gauge(campaigns_client) -> None:
     assert response.json()["collected"] == "0.00"
     assert Decimal(response.json()["collected"]) == Decimal("0.00") 
     assert response.json()["percentage"] == 0.0
+
+# ============================================================
+# TESTS DES IMAGES (CAM-12 et CAM-13)
+# ============================================================
+
+@patch("app.modules.campaigns.service.convert_image_to_webp")
+@patch("app.modules.campaigns.service.supabase_admin")
+def test_cam12_upload_image_success(mock_supabase, mock_convert, campaigns_client) -> None:
+    """Teste l'upload réussi d'une image pour une campagne."""
+    client, test_session = campaigns_client
+    admin_id, token = _register_test_user(client, "admin_img1@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Créer la campagne
+    c = client.post("/api/v1/campaigns", json=_create_campaign_payload(), headers=headers).json()
+    c_id = c["id_campaign"]
+
+    # 2. Configurer les mocks
+    mock_convert.return_value = b"fake_webp_bytes"
+    mock_supabase.storage.from_().get_public_url.return_value = "https://mock.supabase.co/storage/v1/object/public/campaigns/test/cover.webp"
+
+    # 3. Envoyer l'image
+    response = client.post(
+        f"/api/v1/campaigns/{c_id}/image",
+        files={"image": ("test.png", b"fake_png_bytes", "image/png")},
+        headers=headers
+    )
+
+    # 4. Vérifications
+    assert response.status_code == 200
+    assert response.json()["image_url"] == "https://mock.supabase.co/storage/v1/object/public/campaigns/test/cover.webp"
+    mock_convert.assert_called_once_with(b"fake_png_bytes")
+    mock_supabase.storage.from_().upload.assert_called_once()
+
+
+@patch("app.modules.campaigns.service.convert_image_to_webp")
+@patch("app.modules.campaigns.service.supabase_admin")
+def test_cam12_upload_image_already_exists(mock_supabase, mock_convert, campaigns_client) -> None:
+    """Teste qu'on ne peut pas uploader une image si elle existe déjà (CAM-12)."""
+    client, test_session = campaigns_client
+    admin_id, token = _register_test_user(client, "admin_img2@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    c = client.post("/api/v1/campaigns", json=_create_campaign_payload(), headers=headers).json()
+    c_id = c["id_campaign"]
+
+    # Forcer une image_url existante en base
+    with test_session() as session:
+        from app.modules.campaigns.models import Campaign
+        campaign = session.get(Campaign, UUID(c_id))
+        campaign.image_url = "https://existing.url/image.webp"
+        session.commit()
+
+    response = client.post(
+        f"/api/v1/campaigns/{c_id}/image",
+        files={"image": ("test.png", b"fake_png_bytes", "image/png")},
+        headers=headers
+    )
+
+    assert response.status_code == 409
+    assert "existe déjà" in response.json()["detail"]
+
+
+@patch("app.modules.campaigns.service.convert_image_to_webp")
+@patch("app.modules.campaigns.service.supabase_admin")
+def test_cam13_replace_image_success(mock_supabase, mock_convert, campaigns_client) -> None:
+    """Teste le remplacement réussi d'une image existante (CAM-13)."""
+    client, test_session = campaigns_client
+    admin_id, token = _register_test_user(client, "admin_img3@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    c = client.post("/api/v1/campaigns", json=_create_campaign_payload(), headers=headers).json()
+    c_id = c["id_campaign"]
+
+    # Forcer une image_url existante
+    with test_session() as session:
+        from app.modules.campaigns.models import Campaign
+        campaign = session.get(Campaign, UUID(c_id))
+        campaign.image_url = "https://existing.url/image.webp"
+        session.commit()
+
+    # Mocker le nouveau retour
+    mock_convert.return_value = b"fake_webp_bytes"
+    mock_supabase.storage.from_().get_public_url.return_value = "https://mock.supabase.co/storage/v1/object/public/campaigns/test/new_cover.webp"
+
+    response = client.patch(
+        f"/api/v1/campaigns/{c_id}/image",
+        files={"image": ("test.png", b"new_png_bytes", "image/png")},
+        headers=headers
+    )
+
+    assert response.status_code == 200
+    assert response.json()["image_url"] == "https://mock.supabase.co/storage/v1/object/public/campaigns/test/new_cover.webp"
+
+
+def test_upload_image_invalid_mime(campaigns_client) -> None:
+    """Teste le rejet d'un fichier qui n'est pas une image."""
+    client, test_session = campaigns_client
+    admin_id, token = _register_test_user(client, "admin_img4@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    c = client.post("/api/v1/campaigns", json=_create_campaign_payload(), headers=headers).json()
+    c_id = c["id_campaign"]
+
+    # Envoyer un fichier texte
+    response = client.post(
+        f"/api/v1/campaigns/{c_id}/image",
+        files={"image": ("test.txt", b"not_an_image", "text/plain")},
+        headers=headers
+    )
+
+    assert response.status_code == 400
+    assert "n'est pas une image" in response.json()["detail"]
+
+from app.modules.campaigns.models import Campaign
+from unittest.mock import patch
+
+def test_image_url_is_persisted_in_db(campaigns_client) -> None:
+    """
+    Vérifie que l'URL de l'image est bien enregistrée dans la table 'campaigns'
+    après un appel réussi à la route CAM-12.
+    """
+    client, test_session = campaigns_client
+    admin_id, token = _register_test_user(client, "admin_img_db@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Création de la campagne
+    c = client.post("/api/v1/campaigns", json=_create_campaign_payload(), headers=headers).json()
+    campaign_id = UUID(c["id_campaign"])
+
+    # Vérification initiale : l'image_url doit être None en base
+    with test_session() as session:
+        campaign_in_db = session.get(Campaign, campaign_id)
+        assert campaign_in_db.image_url is None
+
+    # 2. Configuration des mocks pour l'upload
+    fake_url = "https://mock.supabase.co/storage/v1/object/public/campaigns/test/cover.webp"
+    
+    with patch("app.modules.campaigns.service.convert_image_to_webp") as mock_convert, \
+         patch("app.modules.campaigns.service.supabase_admin") as mock_supabase:
+        
+        mock_convert.return_value = b"fake_webp"
+        mock_supabase.storage.from_().get_public_url.return_value = fake_url
+
+        # 3. Envoi de l'image
+        response = client.post(
+            f"/api/v1/campaigns/{campaign_id}/image",
+            files={"image": ("test.png", b"fake_png_bytes", "image/png")},
+            headers=headers
+        )
+
+        # Vérification de la réponse API
+        assert response.status_code == 200
+        assert response.json()["image_url"] == fake_url
+
+    # 4. 🎯 LE TEST CRUCIAL : Vérification en base de données
+    # On ouvre une nouvelle session pour s'assurer que la donnée a bien été commit
+    with test_session() as session:
+        campaign_in_db = session.get(Campaign, campaign_id)
+        
+        # On vérifie que l'URL a bien été persistée
+        assert campaign_in_db.image_url is not None, "L'image_url n'a pas été sauvegardée en base !"
+        assert campaign_in_db.image_url == fake_url, "L'URL en base ne correspond pas à celle retournée par Supabase"
