@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 43200
-
+    supabase_url: str = "https://mock.supabase.co"
+    supabase_service_role_key: str = "mock-service-role-key"
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
