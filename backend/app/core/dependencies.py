@@ -71,3 +71,20 @@ def require_administrator(
             "Rôle requis : Administrator.",
         )
     return user
+
+def require_natural_donation_staff(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> User:
+    """Autorise les rôles liés aux dons naturels : Stock_Manager, Collection_Manager, Administrator."""
+    for role_name in ("Stock_Manager", "Collection_Manager", "Administrator"):
+        assignment = auth_repo.get_latest_role_assignment(
+            session, user.id_user, role_name
+        )
+        if assignment is not None and assignment.assignment_type == "assigned":
+            return user
+
+    raise HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        "Rôle requis : Stock_Manager, Collection_Manager ou Administrator.",
+    )
