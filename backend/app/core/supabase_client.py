@@ -9,3 +9,4 @@ supabase_admin: Client = create_client(
 )
 
 CAMPAIGNS_BUCKET = "campaigns"
+NATURAL_DONATIONS_BUCKET = "natural_donations"

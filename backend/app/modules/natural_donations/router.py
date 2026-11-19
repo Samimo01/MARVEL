@@ -18,7 +18,7 @@ from app.modules.natural_donations.service import (
     NaturalDonNotFoundError, ObjectTypeNotFoundError, 
     InvalidStatusTransitionError, ItemNotFoundError
 )
-
+from fastapi import File, UploadFile
 # ============================================================
 # Routers
 # ============================================================
@@ -97,17 +97,74 @@ def nat02_create_natural_don(
     """NAT-02 : Déclare un don en nature."""
     return don_service.create_natural_don(session, user=user, payload=payload)
 
-@router.post("/donations/natural/{id_don_n}/items/{id_nat}/image", response_model=NaturalDonItemOut)
-def nat03_upload_item_image(
+# ============================================================
+# NAT-03 : Upload de l'image d'un article (Donateur)
+# ============================================================
+@router.post(
+    "/donations/natural/{id_don_n}/items/{id_nat}/image",
+    response_model=NaturalDonItemOut,
+)
+async def nat03_upload_item_image(
     id_don_n: UUID,
     id_nat: UUID,
-    image_url: str, # En vrai, ce serait un UploadFile. On prend une URL pour simplifier.
+    image: UploadFile = File(..., description="Photo de l'article"),
     session: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
 ):
-    """NAT-03 : Téléverse la photo d'un article."""
+    """NAT-03 : Téléverse la photo d'un article (conversion WebP)."""
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
+
+    image_bytes = await image.read()
     try:
-        return don_service.upload_item_image(session, id_don_n, id_nat, image_url)
+        return don_service.upload_item_image(
+            session,
+            user=user,
+            id_don_n=id_don_n,
+            id_nat=id_nat,
+            image_bytes=image_bytes,
+        )
+    except NaturalDonNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ItemNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+
+# ============================================================
+# NAT-19 : Remplacement de l'image d'un article
+# ============================================================
+@router.patch(
+    "/donations/natural/{id_don_n}/items/{id_nat}/image",
+    response_model=NaturalDonItemOut,
+)
+async def nat19_replace_item_image(
+    id_don_n: UUID,
+    id_nat: UUID,
+    image: UploadFile = File(..., description="Nouvelle photo de l'article"),
+    session: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """NAT-19 : Remplace l'image existante d'un article (conversion WebP)."""
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
+
+    image_bytes = await image.read()
+    try:
+        return don_service.replace_item_image(
+            session,
+            user=user,
+            id_don_n=id_don_n,
+            id_nat=id_nat,
+            image_bytes=image_bytes,
+        )
     except NaturalDonNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except ItemNotFoundError as exc:
