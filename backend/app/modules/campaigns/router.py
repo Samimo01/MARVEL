@@ -240,3 +240,57 @@ def cam06_get_donations(
         return campaign_service.get_campaign_donations(session, id_campaign)
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+from fastapi import File, UploadFile
+
+# ============================================================
+# CAM-12 : POST /campaigns/{id}/image
+# ============================================================
+@router.post("/{id_campaign}/image", response_model=CampaignOut)
+async def cam12_upload_campaign_image(
+    id_campaign: UUID,
+    image: UploadFile = File(..., description="Image de la campagne (JPEG, PNG, etc.)"),
+    session: Session = Depends(get_db),
+    user: User = Depends(require_campaign_editor),
+):
+    """CAM-12 : Téléverse la photo d'une campagne (convertie en WebP)."""
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
+    
+    image_bytes = await image.read()
+    try:
+        return campaign_service.upload_campaign_image(
+            session, user=user, id_campaign=id_campaign, image_bytes=image_bytes
+        )
+    except CampaignNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+
+# ============================================================
+# CAM-13 : PATCH /campaigns/{id}/image
+# ============================================================
+@router.patch("/{id_campaign}/image", response_model=CampaignOut)
+async def cam13_replace_campaign_image(
+    id_campaign: UUID,
+    image: UploadFile = File(..., description="Nouvelle image de la campagne"),
+    session: Session = Depends(get_db),
+    user: User = Depends(require_campaign_editor),
+):
+    """CAM-13 : Téléverse et remplace l'image existante (convertie en WebP)."""
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
+    
+    image_bytes = await image.read()
+    try:
+        return campaign_service.replace_campaign_image(
+            session, user=user, id_campaign=id_campaign, image_bytes=image_bytes
+        )
+    except CampaignNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
