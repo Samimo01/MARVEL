@@ -1,4 +1,4 @@
-"""Accès aux données du module natural_donations."""
+"""AccÃ¨s aux donnÃ©es du module natural_donations."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -7,7 +7,12 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, selectinload
 
-from app.modules.natural_donations.models import NaturalDon, NaturalDonItem, ObjectType
+from app.modules.natural_donations.models import (
+    Collect,
+    NaturalDon,
+    NaturalDonItem,
+    ObjectType,
+)
 
 
 # ============================================================
@@ -42,6 +47,15 @@ def get_natural_don_by_id(session: Session, id_don_n: UUID, with_items: bool = T
         stmt = stmt.options(selectinload(NaturalDon.items))
     return session.scalar(stmt)
 
+def get_natural_don_by_collect_id(
+    session: Session,
+    id_collect: UUID
+) -> NaturalDon | None:
+    stmt = select(NaturalDon).where(
+        NaturalDon.id_collect == id_collect
+    )
+    return session.scalar(stmt)
+
 def list_natural_dons(session: Session, status: str | None = None) -> list[NaturalDon]:
     stmt = select(NaturalDon).order_by(NaturalDon.created_at.desc())
     if status:
@@ -67,3 +81,44 @@ def get_natural_don_item(session: Session, id_don_n: UUID, id_nat: UUID) -> Natu
             NaturalDonItem.id_nat == id_nat
         )
     )
+
+# ============================================================
+# COLLECTS
+# ============================================================
+def add_collect(session: Session, collect: Collect) -> None:
+    session.add(collect)
+    session.flush()
+
+
+def get_collect_by_id(session: Session, id_collect: UUID) -> Collect | None:
+    return session.get(Collect, id_collect)
+
+def update_collect(session: Session, collect: Collect, data: dict) -> Collect:
+    for field, value in data.items():
+        setattr(collect, field, value)
+
+    session.flush()
+    return collect
+
+def list_collects(
+    session: Session,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    status: str | None = None,
+) -> list[Collect]:
+    stmt = (
+        select(Collect)
+        .join(NaturalDon, NaturalDon.id_collect == Collect.id_collect)
+        .order_by(Collect.planned_at.asc())
+    )
+
+    if start_date:
+        stmt = stmt.where(Collect.planned_at >= start_date)
+
+    if end_date:
+        stmt = stmt.where(Collect.planned_at <= end_date)
+
+    if status:
+        stmt = stmt.where(NaturalDon.status == status)
+
+    return list(session.scalars(stmt).all())
