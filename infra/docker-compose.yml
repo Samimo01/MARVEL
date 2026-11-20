@@ -81,6 +81,35 @@ services:
     networks:
       - marvel-network
 
+  uptime-kuma:
+    image: louislam/uptime-kuma:2
+    container_name: marvel-uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3001/', r => process.exit(r.statusCode >= 200 && r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - marvel-network
+
 networks:
   marvel-network:
     driver: bridge
+
+volumes:
+  uptime-kuma-data:
