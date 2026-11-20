@@ -109,3 +109,20 @@ def require_stock_manager_or_admin(
         status.HTTP_403_FORBIDDEN,
         "Rôle requis : Stock_Manager ou Administrator.",
     )
+    
+def require_volunteer(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> User:
+    """Autorise uniquement les bénévoles ayant un rôle actif."""
+    assignment = auth_repo.get_latest_role_assignment(
+        session, user.id_user, "Volunteer"
+    )
+
+    if assignment is None or assignment.assignment_type != "assigned":
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Rôle requis : Volunteer.",
+        )
+
+    return user
