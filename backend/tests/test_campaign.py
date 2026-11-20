@@ -11,8 +11,8 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
-from app.modules.campaigns.models import Campaign
-from app.modules.financial_donations.models import FinancialDon 
+from app.modules.campaigns.models import Campaign, Event
+from app.modules.financial_donations.models import FinancialDon
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -20,20 +20,21 @@ from unittest.mock import patch
 def campaigns_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
     monkeypatch.setattr(settings, "jwt_secret_key", "test-jwt-secret-for-tests-at-least-32-bytes")
     monkeypatch.setattr(settings, "access_token_expire_minutes", 30 * 24 * 60)
-    
+
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    
-    # 👇 AJOUT DE FinancialDon.__table__ DANS LA LISTE
+
+    # ðŸ‘‡ AJOUT DE FinancialDon.__table__ DANS LA LISTE
     test_tables = [
-        User.__table__, Role.__table__, RoleAssignment.__table__, RevokedToken.__table__,
-        Campaign.__table__, FinancialDon.__table__
+    User.__table__, Role.__table__, RoleAssignment.__table__,
+    RevokedToken.__table__, Campaign.__table__,
+    FinancialDon.__table__, Event.__table__
     ]
     Base.metadata.create_all(engine, tables=test_tables)
-    
+
     test_session = sessionmaker(bind=engine, autoflush=False)
     monkeypatch.setattr("app.main.SessionLocal", test_session)
 
@@ -146,16 +147,16 @@ def test_get_gauge(campaigns_client) -> None:
     headers = {"Authorization": f"Bearer {token}"}
 
     c = client.post("/api/v1/campaigns", json=_create_campaign_payload(), headers=headers).json()
-    
-    # Vérifier que la campagne a bien un ID
-    assert "id_campaign" in c, f"Erreur création campagne: {c}"
+
+    # VÃ©rifier que la campagne a bien un ID
+    assert "id_campaign" in c, f"Erreur crÃ©ation campagne: {c}"
 
     response = client.get(f"/api/v1/campaigns/{c['id_campaign']}/gauge")
 
     assert response.status_code == 200
     assert response.json()["goal"] == "10000.00"
     assert response.json()["collected"] == "0.00"
-    assert Decimal(response.json()["collected"]) == Decimal("0.00") 
+    assert Decimal(response.json()["collected"]) == Decimal("0.00")
     assert response.json()["percentage"] == 0.0
 
 # ============================================================
@@ -165,13 +166,13 @@ def test_get_gauge(campaigns_client) -> None:
 @patch("app.modules.campaigns.service.convert_image_to_webp")
 @patch("app.modules.campaigns.service.supabase_admin")
 def test_cam12_upload_image_success(mock_supabase, mock_convert, campaigns_client) -> None:
-    """Teste l'upload réussi d'une image pour une campagne."""
+    """Teste l'upload rÃ©ussi d'une image pour une campagne."""
     client, test_session = campaigns_client
     admin_id, token = _register_test_user(client, "admin_img1@example.com")
     _assign_administrator_role(test_session, admin_id)
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 1. Créer la campagne
+    # 1. CrÃ©er la campagne
     c = client.post("/api/v1/campaigns", json=_create_campaign_payload(), headers=headers).json()
     c_id = c["id_campaign"]
 
@@ -186,7 +187,7 @@ def test_cam12_upload_image_success(mock_supabase, mock_convert, campaigns_clien
         headers=headers
     )
 
-    # 4. Vérifications
+    # 4. VÃ©rifications
     assert response.status_code == 200
     assert response.json()["image_url"] == "https://mock.supabase.co/storage/v1/object/public/campaigns/test/cover.webp"
     mock_convert.assert_called_once_with(b"fake_png_bytes")
@@ -196,7 +197,7 @@ def test_cam12_upload_image_success(mock_supabase, mock_convert, campaigns_clien
 @patch("app.modules.campaigns.service.convert_image_to_webp")
 @patch("app.modules.campaigns.service.supabase_admin")
 def test_cam12_upload_image_already_exists(mock_supabase, mock_convert, campaigns_client) -> None:
-    """Teste qu'on ne peut pas uploader une image si elle existe déjà (CAM-12)."""
+    """Teste qu'on ne peut pas uploader une image si elle existe dÃ©jÃ  (CAM-12)."""
     client, test_session = campaigns_client
     admin_id, token = _register_test_user(client, "admin_img2@example.com")
     _assign_administrator_role(test_session, admin_id)
@@ -219,13 +220,13 @@ def test_cam12_upload_image_already_exists(mock_supabase, mock_convert, campaign
     )
 
     assert response.status_code == 409
-    assert "existe déjà" in response.json()["detail"]
+    assert "existe dÃ©jÃ " in response.json()["detail"]
 
 
 @patch("app.modules.campaigns.service.convert_image_to_webp")
 @patch("app.modules.campaigns.service.supabase_admin")
 def test_cam13_replace_image_success(mock_supabase, mock_convert, campaigns_client) -> None:
-    """Teste le remplacement réussi d'une image existante (CAM-13)."""
+    """Teste le remplacement rÃ©ussi d'une image existante (CAM-13)."""
     client, test_session = campaigns_client
     admin_id, token = _register_test_user(client, "admin_img3@example.com")
     _assign_administrator_role(test_session, admin_id)
@@ -280,29 +281,29 @@ from unittest.mock import patch
 
 def test_image_url_is_persisted_in_db(campaigns_client) -> None:
     """
-    Vérifie que l'URL de l'image est bien enregistrée dans la table 'campaigns'
-    après un appel réussi à la route CAM-12.
+    VÃ©rifie que l'URL de l'image est bien enregistrÃ©e dans la table 'campaigns'
+    aprÃ¨s un appel rÃ©ussi Ã  la route CAM-12.
     """
     client, test_session = campaigns_client
     admin_id, token = _register_test_user(client, "admin_img_db@example.com")
     _assign_administrator_role(test_session, admin_id)
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 1. Création de la campagne
+    # 1. CrÃ©ation de la campagne
     c = client.post("/api/v1/campaigns", json=_create_campaign_payload(), headers=headers).json()
     campaign_id = UUID(c["id_campaign"])
 
-    # Vérification initiale : l'image_url doit être None en base
+    # VÃ©rification initiale : l'image_url doit Ãªtre None en base
     with test_session() as session:
         campaign_in_db = session.get(Campaign, campaign_id)
         assert campaign_in_db.image_url is None
 
     # 2. Configuration des mocks pour l'upload
     fake_url = "https://mock.supabase.co/storage/v1/object/public/campaigns/test/cover.webp"
-    
+
     with patch("app.modules.campaigns.service.convert_image_to_webp") as mock_convert, \
          patch("app.modules.campaigns.service.supabase_admin") as mock_supabase:
-        
+
         mock_convert.return_value = b"fake_webp"
         mock_supabase.storage.from_().get_public_url.return_value = fake_url
 
@@ -313,15 +314,189 @@ def test_image_url_is_persisted_in_db(campaigns_client) -> None:
             headers=headers
         )
 
-        # Vérification de la réponse API
+        # VÃ©rification de la rÃ©ponse API
         assert response.status_code == 200
         assert response.json()["image_url"] == fake_url
 
-    # 4. 🎯 LE TEST CRUCIAL : Vérification en base de données
-    # On ouvre une nouvelle session pour s'assurer que la donnée a bien été commit
+    # 4. ðŸŽ¯ LE TEST CRUCIAL : VÃ©rification en base de donnÃ©es
+    # On ouvre une nouvelle session pour s'assurer que la donnÃ©e a bien Ã©tÃ© commit
     with test_session() as session:
         campaign_in_db = session.get(Campaign, campaign_id)
-        
-        # On vérifie que l'URL a bien été persistée
-        assert campaign_in_db.image_url is not None, "L'image_url n'a pas été sauvegardée en base !"
-        assert campaign_in_db.image_url == fake_url, "L'URL en base ne correspond pas à celle retournée par Supabase"
+
+        # On vÃ©rifie que l'URL a bien Ã©tÃ© persistÃ©e
+        assert campaign_in_db.image_url is not None, "L'image_url n'a pas Ã©tÃ© sauvegardÃ©e en base !"
+        assert campaign_in_db.image_url == fake_url, "L'URL en base ne correspond pas Ã  celle retournÃ©e par Supabase"
+
+
+# ============================================================
+# TESTS DES EVENEMENTS (CAM-10 Ã  CAM-14 et CAT-03 Ã  CAT-04)
+# ============================================================
+
+def _create_test_event(client: TestClient, headers: dict, campaign_id: str) -> dict:
+    """CrÃ©e un Ã©vÃ©nement de test et retourne sa rÃ©ponse JSON."""
+    payload = {
+        "title": "Iftar Solidaire",
+        "event_at": "2099-03-20T17:30:00Z",
+        "place": "MosquÃ©e El Feth, Alger",
+        "goal": 20000.00
+    }
+
+    response = client.post(
+        f"/api/v1/campaigns/{campaign_id}/events",
+        json=payload,
+        headers=headers
+    )
+
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_event_crud_success(campaigns_client) -> None:
+    """Teste la crÃ©ation, consultation, modification et suppression d'un Ã©vÃ©nement."""
+    client, test_session = campaigns_client
+
+    admin_id, token = _register_test_user(client, "admin_events@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # CrÃ©ation d'une campagne
+    campaign_response = client.post(
+        "/api/v1/campaigns",
+        json=_create_campaign_payload(),
+        headers=headers
+    )
+    assert campaign_response.status_code == 201
+    campaign_id = campaign_response.json()["id_campaign"]
+
+    # CAM-10 : CrÃ©ation d'un Ã©vÃ©nement
+    event = _create_test_event(client, headers, campaign_id)
+    event_id = event["id_event"]
+
+    assert event["title"] == "Iftar Solidaire"
+    assert event["id_campaign"] == campaign_id
+
+    # CAM-11 : Liste des Ã©vÃ©nements
+    response = client.get("/api/v1/events", headers=headers)
+    assert response.status_code == 200
+    assert any(e["id_event"] == event_id for e in response.json())
+
+    # CAM-12 : Consultation d'un Ã©vÃ©nement
+    response = client.get(f"/api/v1/events/{event_id}", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["title"] == "Iftar Solidaire"
+
+    # CAM-13 : Modification d'un Ã©vÃ©nement
+    response = client.patch(
+        f"/api/v1/events/{event_id}",
+        json={"title": "Iftar Solidaire 2026"},
+        headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["title"] == "Iftar Solidaire 2026"
+
+    # CAM-14 : Suppression d'un Ã©vÃ©nement
+    response = client.delete(
+        f"/api/v1/events/{event_id}",
+        headers=headers
+    )
+    assert response.status_code in (200, 204)
+
+    # VÃ©rifier que l'Ã©vÃ©nement n'existe plus
+    response = client.get(f"/api/v1/events/{event_id}", headers=headers)
+    assert response.status_code == 404
+
+
+def test_event_creation_unauthorized(campaigns_client) -> None:
+    """VÃ©rifie qu'un utilisateur sans rÃ´le autorisÃ© ne peut pas crÃ©er d'Ã©vÃ©nement."""
+    client, test_session = campaigns_client
+
+    admin_id, admin_token = _register_test_user(
+        client, "admin_events_auth@example.com"
+    )
+    _assign_administrator_role(test_session, admin_id)
+
+    campaign_response = client.post(
+        "/api/v1/campaigns",
+        json=_create_campaign_payload(),
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    campaign_id = campaign_response.json()["id_campaign"]
+
+    _, user_token = _register_test_user(
+        client, "user_events_auth@example.com"
+    )
+
+    response = client.post(
+        f"/api/v1/campaigns/{campaign_id}/events",
+        json={
+            "title": "Ã‰vÃ©nement non autorisÃ©",
+            "event_at": "2099-03-20T17:30:00Z",
+            "place": "Alger",
+            "goal": 1000.00
+        },
+        headers={"Authorization": f"Bearer {user_token}"}
+    )
+
+    assert response.status_code == 403
+
+
+def test_event_creation_without_authentication(campaigns_client) -> None:
+    """VÃ©rifie que la crÃ©ation nÃ©cessite une authentification."""
+    client, test_session = campaigns_client
+
+    admin_id, token = _register_test_user(
+        client, "admin_events_noauth@example.com"
+    )
+    _assign_administrator_role(test_session, admin_id)
+
+    campaign_response = client.post(
+        "/api/v1/campaigns",
+        json=_create_campaign_payload(),
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    campaign_id = campaign_response.json()["id_campaign"]
+
+    response = client.post(
+        f"/api/v1/campaigns/{campaign_id}/events",
+        json={
+            "title": "Ã‰vÃ©nement sans authentification",
+            "event_at": "2099-03-20T17:30:00Z",
+            "place": "Alger",
+            "goal": 1000.00
+        }
+    )
+
+    assert response.status_code == 401
+
+
+def test_public_event_catalog(campaigns_client) -> None:
+    """VÃ©rifie que le catalogue public expose les Ã©vÃ©nements futurs."""
+    client, test_session = campaigns_client
+
+    admin_id, token = _register_test_user(
+        client, "admin_events_catalog@example.com"
+    )
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    campaign_response = client.post(
+        "/api/v1/campaigns",
+        json=_create_campaign_payload(),
+        headers=headers
+    )
+    campaign_id = campaign_response.json()["id_campaign"]
+
+    event = _create_test_event(client, headers, campaign_id)
+    event_id = event["id_event"]
+
+    # CAT-03 : Liste publique des Ã©vÃ©nements futurs
+    response = client.get("/api/v1/catalogue/events")
+
+    assert response.status_code == 200
+    assert any(e["id_event"] == event_id for e in response.json())
+
+    # CAT-04 : DÃ©tail public d'un Ã©vÃ©nement
+    response = client.get(f"/api/v1/catalogue/events/{event_id}")
+
+    assert response.status_code == 200
+    assert response.json()["id_event"] == event_id

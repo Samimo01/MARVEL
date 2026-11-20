@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy du module campaigns."""
+"""ModÃ¨les SQLAlchemy du module campaigns."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -55,9 +55,9 @@ class Campaign(Base):
     status: Mapped[str] = mapped_column(
         campaign_status_type, nullable=False, default="Draft", server_default="Draft"
     )
-    
+
     categories: Mapped[list[str] | None] = mapped_column(ArrayOfEnum(campaign_category_type))
-    
+
     image_url: Mapped[str | None] = mapped_column(String)
     closure_reason: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(
@@ -71,4 +71,33 @@ class Campaign(Base):
         Uuid(as_uuid=True),
         ForeignKey("users.id_user", ondelete="CASCADE"),
         nullable=False,
+    )
+
+class Event(Base):
+    __tablename__ = "events"
+
+    id_event: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid4
+    )
+
+    title: Mapped[str] = mapped_column(String, nullable=False)
+
+    event_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+
+    place: Mapped[str | None] = mapped_column(String)
+
+    goal: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now()
+    )
+
+    id_campaign: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("campaigns.id_campaign", ondelete="CASCADE"),
+        nullable=False
     )

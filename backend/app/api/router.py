@@ -10,8 +10,8 @@ from app.modules.beneficiaries.router import router as beneficiaries_router
 from app.modules.budget.router import router as budget_router
 from app.modules.campaigns.router import (
     campaign_catalog_router,
-)
-from app.modules.campaigns.router import (
+    events_router,
+    event_catalog_router,
     router as campaigns_router,
 )
 from app.modules.dashboard.router import router as dashboard_router
@@ -31,6 +31,8 @@ for module_router in (
     auth_admin_router,
     campaigns_router,
     campaign_catalog_router,
+    events_router,
+    event_catalog_router,
     financial_donations_router,
     natural_donations_router,
     natural_admin_router,

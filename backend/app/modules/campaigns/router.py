@@ -16,21 +16,27 @@ from app.modules.campaigns.schemas import (
     CampaignProgressOut,
     CampaignUpdate,
     FinancialDonOut,
+    EventCreate,
+    EventOut,
+    EventUpdate,
     GaugeOut,
 )
 from app.modules.campaigns.service import (
     CampaignNotFoundError,
     CampaignTitleAlreadyExistsError,
     InvalidStatusTransitionError,
+    EventNotFoundError,
 )
 
 
 # ============================================================
-# Déclaration des routers
+# DÃ©claration des routers
 # ============================================================
 campaign_catalog_router = APIRouter(prefix="/catalog/campaigns", tags=["catalog"])
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 
+events_router = APIRouter(prefix="/events", tags=["Events"])
+event_catalog_router = APIRouter(prefix="/catalogue/events", tags=["catalog"])
 
 # ============================================================
 # ROUTES PUBLIQUES (CAT-01, CAT-02, CAM-07)
@@ -50,7 +56,7 @@ def cam07_list_closed_campaigns(
     limit: int = 50,
     offset: int = 0,
 ):
-    """CAM-07 : Campagnes fermées avec jauge."""
+    """CAM-07 : Campagnes fermÃ©es avec jauge."""
     return campaign_service.list_closed_campaigns(session, limit=limit, offset=offset)
 
 @campaign_catalog_router.get("/{id_campaign}", response_model=CampaignProgressOut)
@@ -58,7 +64,7 @@ def cat02_campaign_detail(
     id_campaign: UUID,
     session: Session = Depends(get_db),
 ):
-    """CAT-02 : Détail d'une campagne publique."""
+    """CAT-02 : DÃ©tail d'une campagne publique."""
     try:
         return campaign_service.get_public_campaign(session, id_campaign)
     except CampaignNotFoundError as exc:
@@ -66,7 +72,7 @@ def cat02_campaign_detail(
 
 
 # ============================================================
-# ROUTES PRIVÉES DE CRÉATION ET LISTES SPÉCIFIQUES
+# ROUTES PRIVÃ‰ES DE CRÃ‰ATION ET LISTES SPÃ‰CIFIQUES
 # ============================================================
 @router.post("/draft", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
 def cam11_create_draft_campaign(
@@ -74,7 +80,7 @@ def cam11_create_draft_campaign(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor),
 ):
-    """CAM-11 : Créer une campagne en mode brouillon."""
+    """CAM-11 : CrÃ©er une campagne en mode brouillon."""
     try:
         return campaign_service.create_draft_campaign(session, user=user, payload=payload)
     except CampaignTitleAlreadyExistsError as exc:
@@ -95,12 +101,12 @@ def cam10_list_user_invisible_campaigns(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """CAM-10 : Toutes les campagnes désactivées d'un utilisateur."""
+    """CAM-10 : Toutes les campagnes dÃ©sactivÃ©es d'un utilisateur."""
     return campaign_service.list_user_invisible_campaigns(session, id_user)
 
 
 # ============================================================
-# ROUTES PRIVÉES DE GESTION GLOBALE
+# ROUTES PRIVÃ‰ES DE GESTION GLOBALE
 # ============================================================
 @router.post("", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
 def cat07_create_campaign(
@@ -108,7 +114,7 @@ def cat07_create_campaign(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor),
 ):
-    """CAT-07 : Créer une campagne."""
+    """CAT-07 : CrÃ©er une campagne."""
     try:
         return campaign_service.create_campaign(session, user=user, payload=payload)
     except CampaignTitleAlreadyExistsError as exc:
@@ -135,7 +141,7 @@ def cam02_get_campaign_private(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor),
 ):
-    """Détail privé d'une campagne."""
+    """DÃ©tail privÃ© d'une campagne."""
     try:
         campaign = campaign_service._get_or_raise(session, id_campaign)
         return CampaignOut.model_validate(campaign)
@@ -208,7 +214,7 @@ def cam04_close_campaign(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor),
 ):
-    """CAM-04 : Clôturer une campagne."""
+    """CAM-04 : ClÃ´turer une campagne."""
     try:
         return campaign_service.close_campaign_action(
             session, user=user, id_campaign=id_campaign, reason=reason
@@ -235,7 +241,7 @@ def cam06_get_donations(
     session: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """CAM-06 : Dons rattachés à la campagne."""
+    """CAM-06 : Dons rattachÃ©s Ã  la campagne."""
     try:
         return campaign_service.get_campaign_donations(session, id_campaign)
     except CampaignNotFoundError as exc:
@@ -252,13 +258,13 @@ async def cam12_upload_campaign_image(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor),
 ):
-    """CAM-12 : Téléverse la photo d'une campagne (convertie en WebP)."""
+    """CAM-12 : TÃ©lÃ©verse la photo d'une campagne (convertie en WebP)."""
     if not image.content_type.startswith("image/"):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "Le fichier fourni n'est pas une image.",
         )
-    
+
     image_bytes = await image.read()
     try:
         return campaign_service.upload_campaign_image(
@@ -280,17 +286,116 @@ async def cam13_replace_campaign_image(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor),
 ):
-    """CAM-13 : Téléverse et remplace l'image existante (convertie en WebP)."""
+    """CAM-13 : TÃ©lÃ©verse et remplace l'image existante (convertie en WebP)."""
     if not image.content_type.startswith("image/"):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "Le fichier fourni n'est pas une image.",
         )
-    
+
     image_bytes = await image.read()
     try:
         return campaign_service.replace_campaign_image(
             session, user=user, id_campaign=id_campaign, image_bytes=image_bytes
         )
     except CampaignNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+# ============================================================
+# GESTION DES Ã‰VÃ‰NEMENTS
+# ============================================================
+
+@router.post(
+    "/{id_campaign}/events",
+    response_model=EventOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def cam10_create_event(
+    id_campaign: UUID,
+    payload: EventCreate,
+    session: Session = Depends(get_db),
+    user: User = Depends(require_campaign_editor),
+):
+    try:
+        return campaign_service.create_event(
+            session, id_campaign=id_campaign, payload=payload
+        )
+    except CampaignNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@events_router.get("", response_model=list[EventOut])
+def cam11_list_events(
+    event_at: datetime | None = None,
+    id_campaign: UUID | None = None,
+    session: Session = Depends(get_db),
+    user: User = Depends(require_campaign_editor),
+):
+    return campaign_service.list_events(
+        session, event_at=event_at, id_campaign=id_campaign
+    )
+
+
+@events_router.get("/{id_event}", response_model=EventOut)
+def cam12_get_event(
+    id_event: UUID,
+    session: Session = Depends(get_db),
+    user: User = Depends(require_campaign_editor),
+):
+    try:
+        return campaign_service.get_event(session, id_event)
+    except EventNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@events_router.patch("/{id_event}", response_model=EventOut)
+def cam13_update_event(
+    id_event: UUID,
+    payload: EventUpdate,
+    session: Session = Depends(get_db),
+    user: User = Depends(require_campaign_editor),
+):
+    try:
+        return campaign_service.update_event(
+            session, id_event=id_event, payload=payload
+        )
+    except EventNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@events_router.delete(
+    "/{id_event}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def cam14_delete_event(
+    id_event: UUID,
+    session: Session = Depends(get_db),
+    user: User = Depends(require_campaign_editor),
+):
+    try:
+        campaign_service.delete_event(session, id_event)
+    except EventNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+# ============================================================
+# ROUTES PUBLIQUES DES Ã‰VÃ‰NEMENTS (CAT-03, CAT-04)
+# ============================================================
+
+@event_catalog_router.get("", response_model=list[EventOut])
+def cat03_list_upcoming_events(
+    session: Session = Depends(get_db),
+):
+    """CAT-03 : Liste publique des Ã©vÃ©nements Ã  venir."""
+    return campaign_service.list_upcoming_events(session)
+
+
+@event_catalog_router.get("/{id_event}", response_model=EventOut)
+def cat04_get_public_event(
+    id_event: UUID,
+    session: Session = Depends(get_db),
+):
+    """CAT-04 : DÃ©tail public d'un Ã©vÃ©nement."""
+    try:
+        return campaign_service.get_event(session, id_event)
+    except EventNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
