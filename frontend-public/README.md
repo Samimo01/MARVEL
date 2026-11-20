@@ -33,6 +33,7 @@ src/
 
 Sens des dépendances : `pages` → `features` → `components`. Un composant de `components/` ne
 connaît jamais le vocabulaire métier (don, campagne…) et n'appelle jamais l'API.
+Les imports internes à `src/` utilisent l'alias `@/` (par exemple `@/components/ui/Button.tsx`).
 
 ## Installation
 

@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
-
-import PublicLayout from './PublicLayout.tsx'
+import PublicLayout from '@/pages/PublicLayout.tsx'
 
 export default function NotFoundPage() {
   return (

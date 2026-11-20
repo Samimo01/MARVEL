@@ -1,8 +1,8 @@
-import EmptyState from '../../../components/feedback/EmptyState.tsx'
-import ErrorMessage from '../../../components/feedback/ErrorMessage.tsx'
-import Spinner from '../../../components/feedback/Spinner.tsx'
-import { useCampaigns } from '../hooks/useCampaigns.ts'
-import CampaignCard from './CampaignCard.tsx'
+import EmptyState from '@/components/feedback/EmptyState.tsx'
+import ErrorMessage from '@/components/feedback/ErrorMessage.tsx'
+import Spinner from '@/components/feedback/Spinner.tsx'
+import { useCampaigns } from '@/features/campaigns/hooks/useCampaigns.ts'
+import CampaignCard from '@/features/campaigns/components/CampaignCard.tsx'
 
 /** Liste des campagnes publiques : prouve la communication front → API. */
 export default function CampaignList() {

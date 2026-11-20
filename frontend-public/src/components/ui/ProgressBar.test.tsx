@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 
-import ProgressBar from './ProgressBar.tsx'
+import ProgressBar from '@/components/ui/ProgressBar.tsx'
 
 describe('ProgressBar', () => {
   it('expose la valeur de manière accessible', () => {
