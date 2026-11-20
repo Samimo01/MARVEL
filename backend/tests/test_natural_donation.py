@@ -16,7 +16,7 @@ from app.main import app
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign
 from app.modules.natural_donations.models import (
-    NaturalDon, NaturalDonItem, ObjectType,
+    NaturalDon, NaturalDonItem, Collect, ObjectType,
 )
 
 
@@ -42,7 +42,7 @@ def natural_client(
     test_tables = [
         User.__table__, Role.__table__, RoleAssignment.__table__, RevokedToken.__table__,
         Campaign.__table__, ObjectType.__table__,
-        NaturalDon.__table__, NaturalDonItem.__table__,
+        Collect.__table__, NaturalDon.__table__, NaturalDonItem.__table__,
     ]
     Base.metadata.create_all(engine, tables=test_tables)
 
@@ -105,7 +105,7 @@ def _create_test_campaign(client: TestClient, headers: dict) -> str:
 
 
 def _create_test_object_type(
-    client: TestClient, headers: dict, name: str = "Vêtements",
+    client: TestClient, headers: dict, name: str = "VÃªtements",
 ) -> str:
     res = client.post(
         "/api/v1/admin/object-types",
@@ -119,7 +119,7 @@ def _create_test_object_type(
 def _create_natural_don_with_item(
     client: TestClient, test_session, admin_headers: dict,
 ) -> tuple[str, str]:
-    """Crée un don naturel + 1 item, retourne (id_don_n, id_nat)."""
+    """CrÃ©e un don naturel + 1 item, retourne (id_don_n, id_nat)."""
     obj_id = _create_test_object_type(client, admin_headers, f"Objet {uuid4().hex[:4]}")
     payload = {
         "recovery_mode": "Deposit",
@@ -138,7 +138,7 @@ def _create_natural_don_with_item(
 
 
 # ============================================================
-# TESTS OBJECT TYPES (NAT-01, NAT-15 à NAT-18)
+# TESTS OBJECT TYPES (NAT-01, NAT-15 Ã  NAT-18)
 # ============================================================
 def test_nat01_list_active_object_types(natural_client) -> None:
     client, test_session = natural_client
@@ -148,7 +148,7 @@ def test_nat01_list_active_object_types(natural_client) -> None:
 
     obj1 = _create_test_object_type(client, headers, "Riz")
     obj2 = _create_test_object_type(client, headers, "Huile")
-    obj3 = _create_test_object_type(client, headers, "Périmé")
+    obj3 = _create_test_object_type(client, headers, "PÃ©rimÃ©")
     client.patch(
         f"/api/v1/admin/object-types/{obj3}/activation?is_active=false",
         headers=headers,
@@ -159,7 +159,7 @@ def test_nat01_list_active_object_types(natural_client) -> None:
     assert len(res.json()) == 2
     names = [o["name"] for o in res.json()]
     assert "Riz" in names and "Huile" in names
-    assert "Périmé" not in names
+    assert "PÃ©rimÃ©" not in names
 
 
 def test_nat15_to_18_object_type_crud(natural_client) -> None:
@@ -191,7 +191,7 @@ def test_nat15_to_18_object_type_crud(natural_client) -> None:
 
 
 # ============================================================
-# TESTS DONS NATURELS (NAT-02 à NAT-11)
+# TESTS DONS NATURELS (NAT-02 Ã  NAT-11)
 # ============================================================
 def test_nat02_create_natural_don(natural_client) -> None:
     client, test_session = natural_client
@@ -219,8 +219,8 @@ def test_nat02_create_natural_don(natural_client) -> None:
 
     quantities = sorted(float(item["declared_quantity"]) for item in data["items"])
     assert quantities == [5.0, 10.0]
-    
-    # On vérifie aussi que les 2 états sont présents
+
+    # On vÃ©rifie aussi que les 2 Ã©tats sont prÃ©sents
     states = {item["declared_state"] for item in data["items"]}
     assert states == {"New", "Good"}
 
@@ -274,12 +274,12 @@ def test_nat07_and_nat08_validate_and_reject(natural_client) -> None:
     don2_id, _ = _create_natural_don_with_item(client, test_session, headers)
     res_rej = client.post(
         f"/api/v1/donations/natural/{don2_id}/reject",
-        json={"refusal_reason": "Objets cassés"},
+        json={"refusal_reason": "Objets cassÃ©s"},
         headers=headers,
     )
     assert res_rej.status_code == 200
     assert res_rej.json()["status"] == "Refuse"
-    assert res_rej.json()["refusal_reason"] == "Objets cassés"
+    assert res_rej.json()["refusal_reason"] == "Objets cassÃ©s"
 
 
 def test_nat09_plan_collect(natural_client) -> None:
@@ -302,7 +302,7 @@ def test_nat09_plan_collect(natural_client) -> None:
 
     plan_payload = {
         "planned_at": "2024-12-01T10:00:00Z",
-        "collection_address": "Cité 12, Alger",
+        "collection_address": "CitÃ© 12, Alger",
     }
     res_plan = client.post(
         f"/api/v1/donations/natural/{don['id_don_n']}/collects",
@@ -353,7 +353,7 @@ def test_nat10_and_nat11_reception_and_stock_in(natural_client) -> None:
 def test_nat03_upload_item_image_success(
     mock_supabase, mock_convert, natural_client,
 ) -> None:
-    """NAT-03 : Upload réussi d'une image d'article."""
+    """NAT-03 : Upload rÃ©ussi d'une image d'article."""
     client, test_session = natural_client
     admin_id, token = _register_test_user(client, "nat_img1@example.com")
     _assign_administrator_role(test_session, admin_id)
@@ -387,7 +387,7 @@ def test_nat03_upload_item_image_success(
 def test_nat03_upload_fails_if_image_exists(
     mock_supabase, mock_convert, natural_client,
 ) -> None:
-    """NAT-03 : Échoue avec 409 si une image existe déjà."""
+    """NAT-03 : Ã‰choue avec 409 si une image existe dÃ©jÃ ."""
     client, test_session = natural_client
     admin_id, token = _register_test_user(client, "nat_img2@example.com")
     _assign_administrator_role(test_session, admin_id)
@@ -407,7 +407,7 @@ def test_nat03_upload_fails_if_image_exists(
     )
 
     assert response.status_code == 409
-    assert "existe déjà" in response.json()["detail"]
+    assert "existe dÃ©jÃ " in response.json()["detail"]
 
 
 def test_nat03_rejects_non_image(natural_client) -> None:
@@ -430,10 +430,10 @@ def test_nat03_rejects_non_image(natural_client) -> None:
 
 
 def test_nat03_rejects_non_owner(natural_client) -> None:
-    """NAT-03 : Seul le propriétaire du don peut uploader une image."""
+    """NAT-03 : Seul le propriÃ©taire du don peut uploader une image."""
     client, test_session = natural_client
 
-    # Admin crée le don
+    # Admin crÃ©e le don
     admin_id, admin_token = _register_test_user(client, "nat_admin@example.com")
     _assign_administrator_role(test_session, admin_id)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -451,7 +451,7 @@ def test_nat03_rejects_non_owner(natural_client) -> None:
     )
 
     assert response.status_code == 409
-    assert "propriétaire" in response.json()["detail"]
+    assert "propriÃ©taire" in response.json()["detail"]
 
 
 # ============================================================
@@ -471,7 +471,7 @@ def test_nat19_replace_item_image(
 
     id_don_n, id_nat = _create_natural_don_with_item(client, test_session, headers)
 
-    # Pré-remplir une image existante
+    # PrÃ©-remplir une image existante
     from app.modules.natural_donations.models import NaturalDonItem
     with test_session() as session:
         item = session.get(NaturalDonItem, (UUID(id_don_n), UUID(id_nat)))
@@ -482,7 +482,7 @@ def test_nat19_replace_item_image(
     new_url = "https://mock.supabase.co/storage/v1/object/public/natural_donations/new.webp"
     mock_supabase.storage.from_().get_public_url.return_value = new_url
 
-    # 👇 Nouvelle URL avec id_don_n ET id_nat
+    # ðŸ‘‡ Nouvelle URL avec id_don_n ET id_nat
     response = client.patch(
         f"/api/v1/donations/natural/{id_don_n}/items/{id_nat}/image",
         files={"image": ("test.png", b"new_png_bytes", "image/png")},
@@ -492,7 +492,7 @@ def test_nat19_replace_item_image(
     assert response.status_code == 200
     assert response.json()["image_url"] == new_url
 
-    # Vérification en DB
+    # VÃ©rification en DB
     with test_session() as session:
         item = session.get(NaturalDonItem, (UUID(id_don_n), UUID(id_nat)))
         assert item.image_url == new_url
@@ -505,7 +505,7 @@ def test_nat19_fails_if_item_not_found(natural_client) -> None:
     _assign_administrator_role(test_session, admin_id)
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Créer un don valide mais avec un id_nat bidon
+    # CrÃ©er un don valide mais avec un id_nat bidon
     id_don_n, _ = _create_natural_don_with_item(client, test_session, headers)
     fake_item_id = uuid4()
 
@@ -554,3 +554,114 @@ def test_nat19_rejects_non_image(natural_client) -> None:
 
     assert response.status_code == 400
     assert "n'est pas une image" in response.json()["detail"]
+
+
+# ============================================================
+# TESTS COLLECTES (NAT-12, NAT-13 et NAT-14)
+# ============================================================
+
+def _create_planned_collect(client: TestClient, headers: dict) -> tuple[str, str]:
+    """CrÃ©e un don naturel validÃ© avec une collecte planifiÃ©e."""
+
+    obj_id = _create_test_object_type(
+        client, headers, f"Objet {uuid4().hex[:4]}"
+    )
+
+    don_res = client.post(
+        "/api/v1/donations/natural",
+        json={
+            "recovery_mode": "Collect",
+            "items": [{
+                "id_object": obj_id,
+                "declared_quantity": 1,
+                "declared_state": "New",
+            }],
+        },
+        headers=headers,
+    )
+    assert don_res.status_code == 201
+    don_id = don_res.json()["id_don_n"]
+
+    validate_res = client.post(
+        f"/api/v1/donations/natural/{don_id}/validate",
+        headers=headers,
+    )
+    assert validate_res.status_code == 200
+
+    plan_res = client.post(
+        f"/api/v1/donations/natural/{don_id}/collects",
+        json={
+            "planned_at": "2026-12-01T10:00:00Z",
+            "collection_address": "Adresse initiale",
+        },
+        headers=headers,
+    )
+    assert plan_res.status_code == 200
+
+    return don_id, plan_res.json()["id_collect"]
+
+
+def test_nat12_list_collects(natural_client) -> None:
+    """NAT-12 : Liste les collectes planifiÃ©es."""
+
+    client, test_session = natural_client
+    admin_id, token = _register_test_user(client, "admin_nat12@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    _, collect_id = _create_planned_collect(client, headers)
+
+    response = client.get("/api/v1/collects", headers=headers)
+
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+    assert any(
+        item["id_collect"] == collect_id
+        for item in response.json()
+    )
+
+
+def test_nat13_update_collect(natural_client) -> None:
+    """NAT-13 : Modifie la date et le lieu d'une collecte."""
+
+    client, test_session = natural_client
+    admin_id, token = _register_test_user(client, "admin_nat13@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    _, collect_id = _create_planned_collect(client, headers)
+
+    response = client.patch(
+        f"/api/v1/collects/{collect_id}",
+        json={
+            "planned_at": "2026-12-02T14:00:00Z",
+            "place": "Nouvelle adresse NAT-13",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id_collect"] == collect_id
+    assert response.json()["place"] == "Nouvelle adresse NAT-13"
+    assert response.json()["planned_at"].startswith("2026-12-02T14:00:00")
+
+
+def test_nat14_confirm_collect(natural_client) -> None:
+    """NAT-14 : Confirme une collecte et met le don en stock."""
+
+    client, test_session = natural_client
+    admin_id, token = _register_test_user(client, "admin_nat14@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    _, collect_id = _create_planned_collect(client, headers)
+
+    response = client.post(
+        f"/api/v1/collects/{collect_id}/confirm",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "In_Stock"
+    assert response.json()["id_stock"] is not None
+    assert response.json()["received_by"] == str(admin_id)

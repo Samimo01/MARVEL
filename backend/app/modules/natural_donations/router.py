@@ -5,17 +5,24 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_campaign_editor
+from datetime import datetime
+
+from app.core.dependencies import (
+    get_current_user,
+    require_campaign_editor,
+    require_natural_donation_staff,
+    require_stock_manager_or_admin,
+)
 from app.database import get_db
 from app.modules.auth.models import User
 from app.modules.natural_donations import service as don_service
 from app.modules.natural_donations.schemas import (
     NaturalDonCreate, NaturalDonOut, NaturalDonWithItemsOut, NaturalDonItemOut,
     NaturalDonReject, NaturalDonCollectPlan, NaturalDonItemReception,
-    ObjectTypeCreate, ObjectTypeUpdate, ObjectTypeOut
+    ObjectTypeCreate, ObjectTypeUpdate, ObjectTypeOut, CollectOut, CollectUpdate
 )
 from app.modules.natural_donations.service import (
-    NaturalDonNotFoundError, ObjectTypeNotFoundError, 
+    NaturalDonNotFoundError, ObjectTypeNotFoundError,
     InvalidStatusTransitionError, ItemNotFoundError
 )
 from fastapi import File, UploadFile
@@ -27,7 +34,7 @@ admin_router = APIRouter(prefix="/admin", tags=["Admin - Object Types"])
 
 
 # ============================================================
-# NAT-01 : Liste des types d'objets actifs (Authentifié)
+# NAT-01 : Liste des types d'objets actifs (AuthentifiÃ©)
 # ============================================================
 @router.get("/object-types", response_model=list[ObjectTypeOut])
 def nat01_list_active_object_types(
@@ -39,14 +46,14 @@ def nat01_list_active_object_types(
 
 
 # ============================================================
-# NAT-15 à NAT-18 : Gestion des types d'objets (Admin/Stock)
+# NAT-15 Ã  NAT-18 : Gestion des types d'objets (Admin/Stock)
 # ============================================================
 @admin_router.get("/object-types", response_model=list[ObjectTypeOut])
 def nat15_list_all_object_types(
     session: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor) # À remplacer par require_stock_manager si existant
+    user: User = Depends(require_campaign_editor) # Ã€ remplacer par require_stock_manager si existant
 ):
-    """NAT-15 : Liste complète des types d'objets."""
+    """NAT-15 : Liste complÃ¨te des types d'objets."""
     return don_service.list_object_types(session, only_active=False)
 
 @admin_router.post("/object-types", response_model=ObjectTypeOut, status_code=status.HTTP_201_CREATED)
@@ -55,7 +62,7 @@ def nat16_create_object_type(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor)
 ):
-    """NAT-16 : Crée un type d'objet."""
+    """NAT-16 : CrÃ©e un type d'objet."""
     return don_service.create_object_type(session, payload)
 
 @admin_router.put("/object-types/{id_object}", response_model=ObjectTypeOut)
@@ -78,7 +85,7 @@ def nat18_toggle_object_type(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor)
 ):
-    """NAT-18 : Active ou désactive un type d'objet."""
+    """NAT-18 : Active ou dÃ©sactive un type d'objet."""
     try:
         return don_service.toggle_object_type_activation(session, id_object, is_active)
     except ObjectTypeNotFoundError as exc:
@@ -86,7 +93,7 @@ def nat18_toggle_object_type(
 
 
 # ============================================================
-# NAT-02 à NAT-11 : Dons en nature
+# NAT-02 Ã  NAT-11 : Dons en nature
 # ============================================================
 @router.post("/donations/natural", response_model=NaturalDonWithItemsOut, status_code=status.HTTP_201_CREATED)
 def nat02_create_natural_don(
@@ -94,7 +101,7 @@ def nat02_create_natural_don(
     session: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    """NAT-02 : Déclare un don en nature."""
+    """NAT-02 : DÃ©clare un don en nature."""
     return don_service.create_natural_don(session, user=user, payload=payload)
 
 # ============================================================
@@ -111,7 +118,7 @@ async def nat03_upload_item_image(
     session: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """NAT-03 : Téléverse la photo d'un article (conversion WebP)."""
+    """NAT-03 : TÃ©lÃ©verse la photo d'un article (conversion WebP)."""
     if not image.content_type.startswith("image/"):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -176,7 +183,7 @@ def nat04_cancel_natural_don(
     session: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    """NAT-04 : Annule la déclaration."""
+    """NAT-04 : Annule la dÃ©claration."""
     try:
         don_service.cancel_natural_don(session, id_don_n, user)
     except NaturalDonNotFoundError as exc:
@@ -199,7 +206,7 @@ def nat06_get_natural_don_detail(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor)
 ):
-    """NAT-06 : Détail du don et de ses articles."""
+    """NAT-06 : DÃ©tail du don et de ses articles."""
     try:
         return don_service.get_natural_don_detail(session, id_don_n)
     except NaturalDonNotFoundError as exc:
@@ -239,7 +246,7 @@ def nat09_plan_collect(
     id_don_n: UUID,
     payload: NaturalDonCollectPlan,
     session: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor)
+    user: User = Depends(require_natural_donation_staff)
 ):
     """NAT-09 : Planifie la collecte."""
     try:
@@ -257,7 +264,7 @@ def nat10_update_item_reception(
     session: Session = Depends(get_db),
     user: User = Depends(require_campaign_editor)
 ):
-    """NAT-10 : Contrôle à la réception."""
+    """NAT-10 : ContrÃ´le Ã  la rÃ©ception."""
     try:
         return don_service.update_item_reception(session, id_don_n, id_nat, user, payload)
     except NaturalDonNotFoundError as exc:
@@ -276,6 +283,60 @@ def nat11_stock_in_natural_don(
     """NAT-11 : Verse les articles conformes dans le Stock."""
     try:
         return don_service.stock_in_natural_don(session, id_don_n, user)
+    except NaturalDonNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+# ============================================================
+# NAT-12 : Liste des collectes planifiÃ©es
+# ============================================================
+@router.get("/collects", response_model=list[CollectOut])
+def nat12_list_collects(
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    status: str | None = None,
+    session: Session = Depends(get_db),
+    user: User = Depends(require_natural_donation_staff),
+):
+    """NAT-12 : Liste les collectes planifiÃ©es."""
+    return don_service.list_collects(
+        session,
+        start_date=start_date,
+        end_date=end_date,
+        status=status,
+    )
+
+# ============================================================
+# NAT-13 : Modification d'une collecte
+# ============================================================
+@router.patch("/collects/{id_collect}", response_model=CollectOut)
+def nat13_update_collect(
+    id_collect: UUID,
+    payload: CollectUpdate,
+    session: Session = Depends(get_db),
+    user: User = Depends(require_natural_donation_staff),
+):
+    """NAT-13 : Modifie la date ou le lieu d'une collecte."""
+    try:
+        return don_service.update_collect(session, id_collect, payload)
+    except NaturalDonNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+# ============================================================
+# NAT-14 : Confirmation d'une collecte
+# ============================================================
+@router.post("/collects/{id_collect}/confirm", response_model=NaturalDonOut)
+def nat14_confirm_collect(
+    id_collect: UUID,
+    session: Session = Depends(get_db),
+    user: User = Depends(require_stock_manager_or_admin),
+):
+    """NAT-14 : Confirme qu'une collecte a eu lieu."""
+    try:
+        return don_service.confirm_collect(session, id_collect, user)
     except NaturalDonNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except InvalidStatusTransitionError as exc:
