@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy du module natural_donations."""
+"""ModÃ¨les SQLAlchemy du module natural_donations."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -8,7 +8,7 @@ from sqlalchemy import (
     Boolean, DateTime, ForeignKey, Numeric, String, Uuid, func,
 )
 from sqlalchemy.dialects.postgresql import ENUM
-from sqlalchemy.orm import Mapped, mapped_column, relationship  # 👈 AJOUTEZ relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # ðŸ‘ˆ AJOUTEZ relationship
 
 from app.database import Base
 
@@ -33,7 +33,7 @@ object_state_type = ENUM(
 
 
 # ============================================================
-# MODÈLES
+# MODÃˆLES
 # ============================================================
 class ObjectType(Base):
     __tablename__ = "object_types"
@@ -54,6 +54,24 @@ class ObjectType(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
+class Collect(Base):
+    __tablename__ = "collects"
+
+    id_collect: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4
+    )
+    place: Mapped[str] = mapped_column(String, nullable=False)
+    planned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False
+    )
+    id_user: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id_user"),
+        nullable=False
+    )
 
 class NaturalDon(Base):
     __tablename__ = "natural_dons"
@@ -90,22 +108,25 @@ class NaturalDon(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    # Clés étrangères
+    # ClÃ©s Ã©trangÃ¨res
     id_user: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id_user", ondelete="CASCADE"), nullable=False
     )
     id_campaign: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("campaigns.id_campaign", ondelete="SET NULL")
     )
-    id_collect: Mapped[str | None] = mapped_column(String)
+    id_collect: Mapped[UUID | None] = mapped_column(
+    Uuid(as_uuid=True),
+    ForeignKey("collects.id_collect")
+    )
     id_stock: Mapped[str | None] = mapped_column(String)
 
-    # 👇 NOUVELLE RELATION : un don a plusieurs articles
+    # ðŸ‘‡ NOUVELLE RELATION : un don a plusieurs articles
     items: Mapped[list["NaturalDonItem"]] = relationship(
         "NaturalDonItem",
         back_populates="natural_don",
         cascade="all, delete-orphan",
-        lazy="selectin",  # charge automatiquement (évite le N+1)
+        lazy="selectin",  # charge automatiquement (Ã©vite le N+1)
     )
 
 
