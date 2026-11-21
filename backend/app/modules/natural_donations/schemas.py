@@ -92,10 +92,22 @@ class NaturalDonOut(BaseModel):
     created_at: datetime
     id_user: UUID
     id_campaign: UUID | None
-    id_collect: str | None
+    id_collect: UUID | None
     id_stock: str | None
     
     model_config = ConfigDict(from_attributes=True)
 
 class NaturalDonWithItemsOut(NaturalDonOut):
     items: list[NaturalDonItemOut]
+
+class CollectOut(BaseModel):
+    id_collect: UUID
+    place: str
+    planned_at: datetime
+    id_user: UUID
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CollectUpdate(BaseModel):
+    planned_at: datetime | None = None
+    place: str | None = Field(None, min_length=1)

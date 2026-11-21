@@ -1,0 +1,197 @@
+
+name: MARVEL CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - feature/devops-dockerisation
+
+  pull_request:
+    branches:
+      - main
+      - master
+      - feature/devops-dockerisation
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+
+  # ==========================================
+  # 0. DETECTION DES FICHIERS MODIFIES
+  # ==========================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+
+  # ==========================================
+  # 1. BACKEND : RUFF ET PYTEST
+  # ==========================================
+  backend:
+    name: Backend - Lint and Tests
+    runs-on: ubuntu-latest
+    needs: changes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Ruff lint
+        if: needs.changes.outputs.backend == 'true'
+        working-directory: backend
+        run: ruff check app tests
+
+      - name: Run backend tests
+        working-directory: backend
+        run: pytest -v
+
+  # ==========================================
+  # 2. FRONTEND PUBLIC : LINT, TESTS ET BUILD
+  # ==========================================
+  frontend-public:
+    name: Frontend Public - Lint, Tests and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend-public/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend-public
+        run: npm ci
+
+      - name: Run lint
+        working-directory: frontend-public
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: frontend-public
+        run: npm run test
+
+      - name: Build frontend
+        working-directory: frontend-public
+        run: npm run build
+
+  # ==========================================
+  # 3. FRONTEND ADMIN : LINT ET BUILD
+  # ==========================================
+  frontend-admin:
+    name: Frontend Admin - Lint and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend-admin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend-admin
+        run: npm ci
+
+      - name: Run lint
+        working-directory: frontend-admin
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: frontend-admin
+        run: npm run build
+
+  # ==========================================
+  # 4. CONSTRUCTION DES IMAGES DOCKER
+  # ==========================================
+  docker:
+    name: Docker Build - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            context: ./backend
+          - service: frontend-public
+            context: ./frontend-public
+          - service: frontend-admin
+            context: ./frontend-admin
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          tags: marvel-${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # ==========================================
+  # 5. DETECTION DES SECRETS AVEC GITLEAKS
+  # ==========================================
+  gitleaks:
+    name: Security - Gitleaks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout full repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

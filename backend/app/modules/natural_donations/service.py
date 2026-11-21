@@ -1,4 +1,4 @@
-"""Logique métier du module natural_donations."""
+"""Logique mÃ©tier du module natural_donations."""
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -8,15 +8,20 @@ from sqlalchemy.orm import Session
 
 from app.modules.auth.models import User
 from app.modules.natural_donations import repository as don_repo
-from app.modules.natural_donations.models import NaturalDon, NaturalDonItem, ObjectType
+from app.modules.natural_donations.models import (
+    Collect,
+    NaturalDon,
+    NaturalDonItem,
+    ObjectType,
+)
 from app.modules.natural_donations.schemas import (
     NaturalDonCreate, NaturalDonOut, NaturalDonWithItemsOut, NaturalDonItemOut,
-    NaturalDonReject, NaturalDonCollectPlan, NaturalDonItemReception,
+    NaturalDonReject, NaturalDonCollectPlan, NaturalDonItemReception,CollectUpdate,
     ObjectTypeCreate, ObjectTypeUpdate, ObjectTypeOut
 )
 from app.core.supabase_client import NATURAL_DONATIONS_BUCKET, supabase_admin
 from app.core.image_utils import convert_image_to_webp
-from app.modules.auth import repository as auth_repo 
+from app.modules.auth import repository as auth_repo
 # ============================================================
 # Exceptions
 # ============================================================
@@ -60,7 +65,7 @@ def _upload_natural_item_image(
 
 
 def _is_staff(session: Session, user: User) -> bool:
-    """Vérifie si l'utilisateur a un rôle de staff via le repository d'auth."""
+    """VÃ©rifie si l'utilisateur a un rÃ´le de staff via le repository d'auth."""
     for role_name in ("Stock_Manager", "Collection_Manager", "Administrator"):
         assignment = auth_repo.get_latest_role_assignment(
             session, user.id_user, role_name
@@ -69,7 +74,7 @@ def _is_staff(session: Session, user: User) -> bool:
             return True
     return False
 # ============================================================
-# NAT-01, NAT-15 à NAT-18 : OBJECT TYPES
+# NAT-01, NAT-15 Ã  NAT-18 : OBJECT TYPES
 # ============================================================
 def list_object_types(session: Session, only_active: bool = False) -> list[ObjectTypeOut]:
     objs = don_repo.list_object_types(session, only_active)
@@ -103,10 +108,10 @@ def toggle_object_type_activation(session: Session, id_object: UUID, is_active: 
 
 
 # ============================================================
-# NAT-02 : Création d'un don
+# NAT-02 : CrÃ©ation d'un don
 # ============================================================
 def create_natural_don(session: Session, *, user: User, payload: NaturalDonCreate) -> NaturalDonWithItemsOut:
-    # 1. Créer le don
+    # 1. CrÃ©er le don
     don = NaturalDon(
         id_user=user.id_user,
         recovery_mode=payload.recovery_mode,
@@ -115,25 +120,25 @@ def create_natural_don(session: Session, *, user: User, payload: NaturalDonCreat
         status="Declare"
     )
     don_repo.add_natural_don(session, don)
-    
-    # 2. Créer les items
+
+    # 2. CrÃ©er les items
     for item_data in payload.items:
         item = NaturalDonItem(
             id_don_n=don.id_don_n,
             **item_data.model_dump()
         )
         session.add(item)
-    
+
     session.commit()
     session.refresh(don)
-    
+
     # On recharge avec les items
     don = don_repo.get_natural_don_by_id(session, don.id_don_n)
     return NaturalDonWithItemsOut.model_validate(don)
 
 
 # ============================================================
-# NAT-03 : Upload (création) de l'image d'un article
+# NAT-03 : Upload (crÃ©ation) de l'image d'un article
 # ============================================================
 def upload_item_image(
     session: Session,
@@ -146,17 +151,17 @@ def upload_item_image(
     don = _get_don_or_raise(session, id_don_n)
 
     is_owner = don.id_user == user.id_user
-    is_staff = _is_staff(session, user) 
-    # 1. Contrôle d'accès : propriétaire OU staff
+    is_staff = _is_staff(session, user)
+    # 1. ContrÃ´le d'accÃ¨s : propriÃ©taire OU staff
     if not is_owner and not is_staff:
         raise InvalidStatusTransitionError(
-            "Vous n'êtes ni le propriétaire du don ni un membre du staff autorisé."
+            "Vous n'Ãªtes ni le propriÃ©taire du don ni un membre du staff autorisÃ©."
         )
 
-    # 2. Vérification du statut (uniquement pour le propriétaire)
+    # 2. VÃ©rification du statut (uniquement pour le propriÃ©taire)
     if not is_staff and don.status != "Declare":
         raise InvalidStatusTransitionError(
-            "L'image ne peut être ajoutée qu'au statut 'Declare'."
+            "L'image ne peut Ãªtre ajoutÃ©e qu'au statut 'Declare'."
         )
 
     item = don_repo.get_natural_don_item(session, id_don_n, id_nat)
@@ -165,7 +170,7 @@ def upload_item_image(
 
     if item.image_url:
         raise InvalidStatusTransitionError(
-            "Une image existe déjà pour cet article. Utilisez PATCH pour la remplacer."
+            "Une image existe dÃ©jÃ  pour cet article. Utilisez PATCH pour la remplacer."
         )
 
     url = _upload_natural_item_image(id_don_n, id_nat, image_bytes, replace=False)
@@ -185,14 +190,14 @@ def replace_item_image(
 ) -> NaturalDonItemOut:
     don = _get_don_or_raise(session, id_don_n)
     item = don_repo.get_natural_don_item(session, id_don_n, id_nat)
-    
+
     if not item:
         raise ItemNotFoundError("Article introuvable")
 
-    # 👇 Contrôle d'accès pour le remplacement
+    # ðŸ‘‡ ContrÃ´le d'accÃ¨s pour le remplacement
     if don.id_user != user.id_user and not _is_staff(session, user):
         raise InvalidStatusTransitionError(
-            "Vous n'êtes ni le propriétaire du don ni un membre du staff autorisé."
+            "Vous n'Ãªtes ni le propriÃ©taire du don ni un membre du staff autorisÃ©."
         )
 
     url = _upload_natural_item_image(id_don_n, id_nat, image_bytes, replace=True)
@@ -206,10 +211,10 @@ def replace_item_image(
 def cancel_natural_don(session: Session, id_don_n: UUID, user: User) -> None:
     don = _get_don_or_raise(session, id_don_n)
     if don.status != "Declare":
-        raise InvalidStatusTransitionError("Seul un don à l'état 'Declare' peut être annulé.")
+        raise InvalidStatusTransitionError("Seul un don Ã  l'Ã©tat 'Declare' peut Ãªtre annulÃ©.")
     if don.id_user != user.id_user:
-        raise InvalidStatusTransitionError("Vous n'êtes pas le propriétaire de ce don.")
-    
+        raise InvalidStatusTransitionError("Vous n'Ãªtes pas le propriÃ©taire de ce don.")
+
     don_repo.delete_natural_don(session, don)
     session.commit()
 
@@ -232,8 +237,8 @@ def get_natural_don_detail(session: Session, id_don_n: UUID) -> NaturalDonWithIt
 def validate_natural_don(session: Session, id_don_n: UUID, user: User) -> NaturalDonOut:
     don = _get_don_or_raise(session, id_don_n)
     if don.status != "Declare":
-        raise InvalidStatusTransitionError("Seul un don à l'état 'Declare' peut être validé.")
-    
+        raise InvalidStatusTransitionError("Seul un don Ã  l'Ã©tat 'Declare' peut Ãªtre validÃ©.")
+
     don.status = "valid"
     don.validated_by = user.id_user
     don.validated_at = datetime.now(timezone.utc)
@@ -248,8 +253,8 @@ def validate_natural_don(session: Session, id_don_n: UUID, user: User) -> Natura
 def reject_natural_don(session: Session, id_don_n: UUID, user: User, payload: NaturalDonReject) -> NaturalDonOut:
     don = _get_don_or_raise(session, id_don_n)
     if don.status in ["In_Stock", "Refuse"]:
-        raise InvalidStatusTransitionError("Ce don ne peut plus être refusé.")
-    
+        raise InvalidStatusTransitionError("Ce don ne peut plus Ãªtre refusÃ©.")
+
     don.status = "Refuse"
     don.refusal_reason = payload.refusal_reason
     don.validated_by = user.id_user
@@ -262,39 +267,122 @@ def reject_natural_don(session: Session, id_don_n: UUID, user: User, payload: Na
 # ============================================================
 # NAT-09 : Planifier une collecte
 # ============================================================
-def plan_natural_don_collect(session: Session, id_don_n: UUID, user: User, payload: NaturalDonCollectPlan) -> NaturalDonOut:
+def plan_natural_don_collect(
+    session: Session,
+    id_don_n: UUID,
+    user: User,
+    payload: NaturalDonCollectPlan
+) -> NaturalDonOut:
     don = _get_don_or_raise(session, id_don_n)
+
     if don.recovery_mode != "Collect":
         raise InvalidStatusTransitionError("Ce don n'est pas en mode 'Collect'.")
+
     if don.status != "valid":
-        raise InvalidStatusTransitionError("Le don doit d'abord être validé.")
-    
+        raise InvalidStatusTransitionError("Le don doit d'abord Ãªtre validÃ©.")
+
+    collect = Collect(
+        place=payload.collection_address,
+        planned_at=payload.planned_at,
+        id_user=user.id_user
+    )
+
+    don_repo.add_collect(session, collect)
+
     don.status = "Collection_Planned"
     don.planned_by = user.id_user
-    don.planned_at = datetime.now(timezone.utc)
+    don.planned_at = payload.planned_at
     don.collection_address = payload.collection_address
+
+    session.flush()
+    don.id_collect = collect.id_collect
+
     session.commit()
     session.refresh(don)
+
     return NaturalDonOut.model_validate(don)
 
+def list_collects(
+    session: Session,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    status: str | None = None,
+):
+    return don_repo.list_collects(
+        session,
+        start_date=start_date,
+        end_date=end_date,
+        status=status,
+    )
 
+def update_collect(
+    session: Session,
+    id_collect: UUID,
+    payload: CollectUpdate,
+) -> Collect:
+    collect = don_repo.get_collect_by_id(session, id_collect)
+
+    if collect is None:
+        raise NaturalDonNotFoundError("Collecte introuvable.")
+
+    data = payload.model_dump(exclude_unset=True)
+
+    if not data:
+        raise InvalidStatusTransitionError("Aucune modification fournie.")
+
+    don_repo.update_collect(session, collect, data)
+
+    session.commit()
+    session.refresh(collect)
+
+    return collect
+
+def confirm_collect(
+    session: Session,
+    id_collect: UUID,
+    user: User,
+) -> NaturalDonOut:
+    collect = don_repo.get_collect_by_id(session, id_collect)
+
+    if collect is None:
+        raise NaturalDonNotFoundError("Collecte introuvable.")
+
+    don = don_repo.get_natural_don_by_collect_id(session, id_collect)
+
+    if don is None:
+        raise NaturalDonNotFoundError("Don associÃ© Ã  cette collecte introuvable.")
+
+    if don.status != "Collection_Planned":
+        raise InvalidStatusTransitionError(
+            "Le don doit avoir le statut Collection_Planned."
+        )
+
+    don.status = "In_Stock"
+    don.received_by = user.id_user
+    don.received_at = datetime.now(timezone.utc)
+    don.id_stock = f"STOCK-{don.id_don_n.hex[:6].upper()}"
+
+    session.commit()
+    session.refresh(don)
+
+    return NaturalDonOut.model_validate(don)
 # ============================================================
-# NAT-10 : Contrôle à la réception
+# NAT-10 : ContrÃ´le Ã  la rÃ©ception
 # ============================================================
 def update_item_reception(session: Session, id_don_n: UUID, id_nat: UUID, user: User, payload: NaturalDonItemReception) -> NaturalDonItemOut:
     don = _get_don_or_raise(session, id_don_n)
     if don.status not in ["valid", "Collection_Planned"]:
-        raise InvalidStatusTransitionError("Le don doit être validé ou planifié.")
-    
+        raise InvalidStatusTransitionError("Le don doit Ãªtre validÃ© ou planifiÃ©.")
+
     item = don_repo.get_natural_don_item(session, id_don_n, id_nat)
     if not item:
         raise ItemNotFoundError("Article introuvable")
-    
+
     item.received_quantity = payload.received_quantity
     item.received_state = payload.received_state
     item.is_compliant = payload.is_compliant
     item.non_compliant_reason = payload.non_compliant_reason
-    
+
     session.commit()
     session.refresh(item)
     return NaturalDonItemOut.model_validate(item)
@@ -306,15 +394,15 @@ def update_item_reception(session: Session, id_don_n: UUID, id_nat: UUID, user: 
 def stock_in_natural_don(session: Session, id_don_n: UUID, user: User) -> NaturalDonOut:
     don = _get_don_or_raise(session, id_don_n)
     if don.status not in ["valid", "Collection_Planned"]:
-        raise InvalidStatusTransitionError("Le don doit être validé ou planifié.")
-    
+        raise InvalidStatusTransitionError("Le don doit Ãªtre validÃ© ou planifiÃ©.")
+
     # Normalement, on ajoute les items conformes au module de stock ici.
-    # Pour l'instant, on simule l'affectation à un ID de stock.
+    # Pour l'instant, on simule l'affectation Ã  un ID de stock.
     don.status = "In_Stock"
     don.received_by = user.id_user
     don.received_at = datetime.now(timezone.utc)
     don.id_stock = f"STOCK-{don.id_don_n.hex[:6].upper()}"
-    
+
     session.commit()
     session.refresh(don)
     return NaturalDonOut.model_validate(don)
