@@ -142,6 +142,14 @@ def list_user_role_assignments(
     return list(latest_by_role.values())
 
 
+def list_active_user_roles(session: Session, user_id: UUID) -> list[RoleName]:
+    return [
+        assignment.role_name
+        for assignment in list_user_role_assignments(session, user_id)
+        if assignment.assignment_type == RoleAssignmentStatus.ASSIGNED
+    ]
+
+
 def _count_active_administrators(session: Session, role_id: UUID) -> int:
     latest_by_user: dict[UUID, str] = {}
     for assignment in repository.list_role_assignments_for_role(session, role_id):

@@ -1,5 +1,14 @@
 /* Reset léger et styles des balises HTML */
 @layer base {
+  html,
+  body,
+  button,
+  input,
+  textarea,
+  select {
+    font-family: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+
   body {
     margin: 0;
     background-color: var(--color-surface-muted);

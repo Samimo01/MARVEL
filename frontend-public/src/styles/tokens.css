@@ -1,17 +1,65 @@
 /* Design tokens : source unique de l'identité visuelle (noms sémantiques).
    Changer le thème de l'association = modifier uniquement ce fichier. */
 @theme {
-  --color-primary: #1d6f5c;
-  --color-primary-hover: #165646;
-  --color-primary-foreground: #ffffff;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f3f6f5;
-  --color-foreground: #1b2a27;
-  --color-muted: #5b6670;
-  --color-border: #d5dcda;
-  --color-success: #1e7a3c;
-  --color-warning: #8a5a00;
-  --color-danger: #b42318;
+  --color-primary: #ff6b4a;
+  --color-primary-hover: #ff8166;
+  --color-primary-foreground: #1b0f3b;
+  --color-secondary: #a478fa;
+  --color-champagne: #f7e7b6;
+  --color-surface: #171429;
+  --color-surface-raised: #24203d;
+  --color-surface-muted: #0d0b1a;
+  --color-foreground: #f8f8ff;
+  --color-muted: #bdbdd8;
+  --color-border: rgba(196, 166, 255, 0.18);
+  --color-success: #73e2ac;
+  --color-warning: #d9a21b;
+  --color-danger: #ff9b80;
 
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Animations d'entrée : "backwards" pour ne pas figer l'état final
+     (sinon elles écraseraient les transitions de survol). */
+  --animate-fade-up: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-slide-in-left: slide-in-left 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-slide-in-right: slide-in-right 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-tab-to-register: tab-to-register 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-tab-to-login: tab-to-login 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+
+  @keyframes fade-up {
+    from { opacity: 0; translate: 0 14px; }
+    to { opacity: 1; translate: 0 0; }
+  }
+  @keyframes slide-in-left {
+    from { opacity: 0; translate: -24px 0; }
+    to { opacity: 1; translate: 0 0; }
+  }
+  @keyframes slide-in-right {
+    from { opacity: 0; translate: 24px 0; }
+    to { opacity: 1; translate: 0 0; }
+  }
+  @keyframes tab-to-register {
+    from { translate: 0 0; }
+    to { translate: 100% 0; }
+  }
+  @keyframes tab-to-login {
+    from { translate: 100% 0; }
+    to { translate: 0 0; }
+  }
+}
+
+/* Mode clair (palette-couleurs.md) : activé par data-theme="light" sur <html>. */
+:root[data-theme='light'] {
+  --color-primary-hover: #f45c3d;
+  --color-secondary: #6337d1;
+  --color-champagne: #e8c76a;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f2edf9;
+  --color-surface-muted: #faf7fc;
+  --color-foreground: #1b0f3b;
+  --color-muted: #5a5777;
+  --color-border: rgba(27, 15, 59, 0.14);
+  --color-success: #1c7d52;
+  --color-warning: #b7791f;
+  --color-danger: #b4300c;
 }

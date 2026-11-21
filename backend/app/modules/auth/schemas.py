@@ -39,18 +39,16 @@ class RegistrationResponse(BaseModel):
     id_user: UUID
     nickname: str | None = None
     image_url: str | None = None
-    access_token: str
-    token_type: str = "bearer"
+
+
+class AuthResponse(BaseModel):
+    message: str
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: SecretStr = Field(min_length=1)
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+    remember_me: bool = False
 
 
 class LogoutResponse(BaseModel):
@@ -63,6 +61,11 @@ class RoleName(StrEnum):
     STOCK_MANAGER = "Stock_Manager"
     TREASURER = "Treasurer"
     ADMINISTRATOR = "Administrator"
+
+
+class AuthSessionResponse(BaseModel):
+    id_user: UUID
+    roles: list[RoleName] = Field(default_factory=list)
 
 
 class RoleAssignmentStatus(StrEnum):

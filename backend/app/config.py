@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 43200
+    auth_cookie_secure: bool = False
     supabase_url: str = "https://mock.supabase.co"
     supabase_service_role_key: str = "mock-service-role-key"
     @property

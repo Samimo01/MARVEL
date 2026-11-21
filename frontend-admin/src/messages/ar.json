@@ -149,11 +149,14 @@
     }
   },
   "userDropdown": {
+    "team": "فريق مارفل",
     "editProfile": "تعديل الملف الشخصي",
     "accountSettings": "إعدادات الحساب",
     "support": "الدعم",
     "language": "اللغة",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "signingOut": "جارٍ تسجيل الخروج…",
+    "logoutError": "تعذّر تسجيل الخروج. يُرجى المحاولة مرة أخرى."
   },
   "ecommerce": {
     "title": "لوحة تحكم التجارة الإلكترونية",

@@ -1,15 +1,26 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_administrator, security
+from app.core.dependencies import get_access_token, get_current_user, require_administrator
 from app.database import get_db
 from app.modules.auth import service
+from app.modules.auth.cookies import clear_access_token_cookie, set_access_token_cookie
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
+    AuthResponse,
+    AuthSessionResponse,
     LoginRequest,
     LogoutResponse,
     RegistrationRequest,
@@ -17,7 +28,6 @@ from app.modules.auth.schemas import (
     RoleAssignmentRequest,
     RoleAssignmentResponse,
     RoleName,
-    TokenResponse,
     UserOut,
 )
 from app.modules.auth.service import (
@@ -35,8 +45,12 @@ admin_router = APIRouter(prefix="/admin", tags=["admin roles"])
 DbSession = Annotated[Session, Depends(get_db)]
 users_router = APIRouter(prefix="/users", tags=["users"])
 
-@router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
+@router.post("/login", response_model=AuthResponse)
+def login(
+    payload: LoginRequest,
+    response: Response,
+    db: DbSession,
+) -> AuthResponse:
     try:
         access_token = service.authenticate_user(db, payload)
     except InvalidCredentialsError as exc:
@@ -45,21 +59,39 @@ def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
             detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
-    return TokenResponse(access_token=access_token)
+    set_access_token_cookie(
+        response,
+        access_token,
+        persistent=payload.remember_me,
+    )
+    return AuthResponse(message="Connexion réussie.")
 
 
 @router.post("/logout", response_model=LogoutResponse)
 def logout(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    response: Response,
+    token: Annotated[str, Depends(get_access_token)],
     db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> LogoutResponse:
     service.revoke_access_token(
         db,
-        token=credentials.credentials,
+        token=token,
         user_id=current_user.id_user,
     )
+    clear_access_token_cookie(response)
     return LogoutResponse(message="Déconnexion réussie.")
+
+
+@router.get("/me", response_model=AuthSessionResponse)
+def current_session(
+    db: DbSession,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> AuthSessionResponse:
+    return AuthSessionResponse(
+        id_user=current_user.id_user,
+        roles=service.list_active_user_roles(db, current_user.id_user),
+    )
 
 
 @router.post(
@@ -69,6 +101,7 @@ def logout(
 )
 async def register(
     payload: Annotated[RegistrationRequest, Form()],
+    response: Response,
     db: DbSession,
     image: Annotated[
         UploadFile | None,
@@ -92,12 +125,12 @@ async def register(
         )
     except DuplicateAccountError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    set_access_token_cookie(response, access_token, persistent=True)
     return RegistrationResponse(
         message="Compte créé.",
         id_user=user.id_user,
         nickname=user.nickname,
         image_url=user.image_url,
-        access_token=access_token,
     )
 
 

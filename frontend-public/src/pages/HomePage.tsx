@@ -7,8 +7,8 @@ export default function HomePage() {
   return (
     <PublicLayout>
       <section className="mb-10">
-        <h1 className="mb-2 text-3xl font-bold">
-          Ensemble, aidons ceux qui en ont besoin
+        <h1 className="mb-2 max-w-3xl text-5xl font-black leading-tight">
+          Rejoignez le mouvement pour <span className="text-[#ff6b4a]">donner.</span>
         </h1>
         <p className="mb-4 max-w-2xl text-muted">
           Chaque don est tracé, du reçu à la distribution. Consultez nos campagnes en cours.

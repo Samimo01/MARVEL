@@ -32,7 +32,7 @@ def check_db_connection() -> None:
     try:
         with SessionLocal() as session:
             session.execute(text("SELECT 1"))
-        print("✅ Connexion Supabase OK")
+        print("Connexion Supabase OK")
     except Exception as exc:
-        print(f"⚠️ Connexion Supabase ÉCHEC : {exc}")
+        print(f"Connexion Supabase ECHEC : {exc}")
         # raise 
