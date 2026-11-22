@@ -6,7 +6,6 @@ from app.modules.auth.router import router as auth_router
 from app.modules.auth.router import users_router
 
 from app.modules.beneficiaries.router import router as beneficiaries_router
-from app.modules.budget.router import router as budget_router
 from app.modules.campaigns.router import (
     campaign_catalog_router,
     events_router,
@@ -40,7 +39,6 @@ for module_router in (
     stock_router,
     beneficiaries_router,
     distributions_router,
-    budget_router,
     treasury_router,
     volunteers_router,
     dashboard_router,
