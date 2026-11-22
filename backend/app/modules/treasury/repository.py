@@ -1,11 +1,10 @@
-
 """Accès aux données du module treasury."""
 
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Numeric, cast, func, or_, select
+from sqlalchemy import Numeric, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.modules.auth.models import Role, RoleAssignment
@@ -13,10 +12,10 @@ from app.modules.campaigns.models import Campaign, Event
 from app.modules.financial_donations.models import FinancialDon
 from app.modules.treasury.models import Fund
 
-
 # ============================================================
 # HELPERS
 # ============================================================
+
 
 def _decimal(value) -> Decimal:
     """Garantit un montant Decimal avec deux décimales."""
@@ -33,6 +32,7 @@ def _sum_amount(session: Session, statement) -> Decimal:
 # LECTURE DES OPÉRATIONS
 # ============================================================
 
+
 def get_fund_by_id(session: Session, id_fund: UUID) -> Fund | None:
     """TRE-02 : Récupère une opération financière par son identifiant."""
     return session.get(Fund, id_fund)
@@ -40,11 +40,8 @@ def get_fund_by_id(session: Session, id_fund: UUID) -> Fund | None:
 
 def list_all_funds(session: Session) -> list[Fund]:
     """TRE-01 : Récupère toutes les opérations financières."""
-    
-    statement = (
-        select(Fund)
-        .order_by(Fund.transaction_at.desc())
-    )
+
+    statement = select(Fund).order_by(Fund.transaction_at.desc())
 
     return list(session.scalars(statement).all())
 
@@ -75,11 +72,7 @@ def list_expenses_by_event(
     if end_date:
         stmt = stmt.where(Fund.transaction_at <= end_date)
 
-    stmt = (
-        stmt.order_by(Fund.transaction_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
+    stmt = stmt.order_by(Fund.transaction_at.desc()).limit(limit).offset(offset)
 
     return list(session.scalars(stmt).all())
 
@@ -87,6 +80,7 @@ def list_expenses_by_event(
 # ============================================================
 # ÉCRITURE DES OPÉRATIONS
 # ============================================================
+
 
 def add_fund(session: Session, fund: Fund) -> None:
     """Ajoute une opération financière."""
@@ -106,6 +100,7 @@ def update_fund(session: Session, fund: Fund, data: dict) -> Fund:
 # ============================================================
 # AGRÉGATS GLOBAUX
 # ============================================================
+
 
 def get_global_donations_total(session: Session) -> Decimal:
     """Calcule le montant total des dons financiers réussis."""
@@ -154,6 +149,7 @@ def get_global_fund_totals(session: Session) -> dict[str, Decimal]:
 # AGRÉGATS PAR CAMPAGNE
 # ============================================================
 
+
 def get_campaign_donations_total(
     session: Session,
     id_campaign: UUID,
@@ -182,9 +178,7 @@ def get_campaign_fund_totals(
 
     income = _sum_amount(
         session,
-        select(
-            cast(func.coalesce(func.sum(Fund.amount), 0), Numeric(15, 2))
-        )
+        select(cast(func.coalesce(func.sum(Fund.amount), 0), Numeric(15, 2)))
         .join(Event, Event.id_event == Fund.id_event)
         .where(
             Event.id_campaign == id_campaign,
@@ -194,9 +188,7 @@ def get_campaign_fund_totals(
 
     expenses = _sum_amount(
         session,
-        select(
-            cast(func.coalesce(func.sum(-Fund.amount), 0), Numeric(15, 2))
-        )
+        select(cast(func.coalesce(func.sum(-Fund.amount), 0), Numeric(15, 2)))
         .join(Event, Event.id_event == Fund.id_event)
         .where(
             Event.id_campaign == id_campaign,
@@ -214,6 +206,7 @@ def get_campaign_fund_totals(
 # AGRÉGATS PAR ÉVÉNEMENT
 # ============================================================
 
+
 def get_event_fund_totals(
     session: Session,
     id_event: UUID,
@@ -222,9 +215,7 @@ def get_event_fund_totals(
 
     income = _sum_amount(
         session,
-        select(
-            cast(func.coalesce(func.sum(Fund.amount), 0), Numeric(15, 2))
-        ).where(
+        select(cast(func.coalesce(func.sum(Fund.amount), 0), Numeric(15, 2))).where(
             Fund.id_event == id_event,
             Fund.amount > 0,
         ),
@@ -232,9 +223,7 @@ def get_event_fund_totals(
 
     expenses = _sum_amount(
         session,
-        select(
-            cast(func.coalesce(func.sum(-Fund.amount), 0), Numeric(15, 2))
-        ).where(
+        select(cast(func.coalesce(func.sum(-Fund.amount), 0), Numeric(15, 2))).where(
             Fund.id_event == id_event,
             Fund.amount < 0,
         ),
@@ -249,6 +238,7 @@ def get_event_fund_totals(
 # ============================================================
 # VÉRIFICATION DES ENTITÉS
 # ============================================================
+
 
 def get_event_by_id(session: Session, id_event: UUID) -> Event | None:
     return session.get(Event, id_event)
@@ -269,9 +259,7 @@ def get_campaign_events_fund_totals(
 
     income = _sum_amount(
         session,
-        select(
-            cast(func.coalesce(func.sum(Fund.amount), 0), Numeric(15, 2))
-        )
+        select(cast(func.coalesce(func.sum(Fund.amount), 0), Numeric(15, 2)))
         .join(Event, Event.id_event == Fund.id_event)
         .where(
             Event.id_campaign == id_campaign,
@@ -281,9 +269,7 @@ def get_campaign_events_fund_totals(
 
     expenses = _sum_amount(
         session,
-        select(
-            cast(func.coalesce(func.sum(-Fund.amount), 0), Numeric(15, 2))
-        )
+        select(cast(func.coalesce(func.sum(-Fund.amount), 0), Numeric(15, 2)))
         .join(Event, Event.id_event == Fund.id_event)
         .where(
             Event.id_campaign == id_campaign,
@@ -316,19 +302,14 @@ def list_system_campaigns(session: Session) -> list[Campaign]:
         .scalar_subquery()
     )
 
-    statement = select(Campaign).where(
-        latest_beneficiary_assignment.is_distinct_from("assigned")
-    )
+    statement = select(Campaign).where(latest_beneficiary_assignment.is_distinct_from("assigned"))
 
     return list(session.scalars(statement).all())
 
+
 def list_all_expenses(session: Session) -> list[Fund]:
     """Récupère toutes les dépenses pour l'export de la trésorerie."""
-    statement = (
-        select(Fund)
-        .where(Fund.amount < 0)
-        .order_by(Fund.transaction_at.desc())
-    )
+    statement = select(Fund).where(Fund.amount < 0).order_by(Fund.transaction_at.desc())
     return list(session.scalars(statement).all())
 
 

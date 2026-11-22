@@ -1,13 +1,13 @@
 """Logique métier du module treasury."""
 
 from datetime import datetime
-from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
+from app.core.image_utils import convert_image_to_webp
+from app.core.supabase_client import TREASURY_BUCKET, supabase_admin
 from app.modules.auth.models import User
-from app.modules.campaigns import repository as campaign_repo
 from app.modules.treasury import repository as treasury_repo
 from app.modules.treasury.models import Fund
 from app.modules.treasury.schemas import (
@@ -22,13 +22,11 @@ from app.modules.treasury.schemas import (
     FundOut,
     SystemCampaignGainsOut,
 )
-from app.core.image_utils import convert_image_to_webp
-from app.core.supabase_client import supabase_admin, TREASURY_BUCKET
-
 
 # ============================================================
 # Exceptions
 # ============================================================
+
 
 class FundNotFoundError(Exception):
     pass
@@ -49,6 +47,7 @@ class InvalidExpenseError(Exception):
 # ============================================================
 # Helpers
 # ============================================================
+
 
 def _get_fund_or_raise(session: Session, id_fund: UUID) -> Fund:
     """Récupère une opération financière ou déclenche une exception."""
@@ -99,9 +98,7 @@ def _upload_expense_image(id_fund: UUID, image_bytes: bytes) -> str:
         return supabase_admin.storage.from_(TREASURY_BUCKET).get_public_url(path)
 
     except Exception as exc:
-        raise InvalidExpenseError(
-            f"Échec du téléversement du justificatif : {exc}"
-        ) from exc
+        raise InvalidExpenseError(f"Échec du téléversement du justificatif : {exc}") from exc
 
 
 def _commit_and_refresh(session: Session, fund: Fund) -> None:
@@ -118,31 +115,32 @@ def _commit_and_refresh(session: Session, fund: Fund) -> None:
 # 	TRE-01 : Liste toutes les opérations financières.
 # ============================================================
 
+
 def list_funds(session: Session) -> list[FundOut]:
     """TRE-01 : Liste toutes les opérations financières."""
 
     funds = treasury_repo.list_all_funds(session)
 
-    return [
-        FundOut.model_validate(fund)
-        for fund in funds
-    ]
+    return [FundOut.model_validate(fund) for fund in funds]
+
 
 # ============================================================
 # TRE-02 : Détail d'une opération financière
 # ============================================================
 
+
 def get_fund_detail(session: Session, id_fund: UUID) -> FundOut:
     """TRE-02 : Récupère le détail d'une opération financière."""
-    
+
     fund = _get_fund_or_raise(session, id_fund)
-    
+
     return FundOut.model_validate(fund)
 
 
 # ============================================================
 # TRE-03 : Enregistrer une dépense
 # ============================================================
+
 
 def create_expense(
     session: Session,
@@ -153,7 +151,7 @@ def create_expense(
     image_bytes: bytes | None = None,
 ) -> ExpenseOut:
     """TRE-03 : Enregistre une dépense associée à un événement."""
-    
+
     _get_event_or_raise(session, id_event)
 
     if payload.justificative and image_bytes:
@@ -191,6 +189,7 @@ def create_expense(
 # TRE-04 : Liste des dépenses d'un événement
 # ============================================================
 
+
 def list_expenses(
     session: Session,
     id_event: UUID,
@@ -202,13 +201,11 @@ def list_expenses(
     offset: int = 0,
 ) -> list[ExpenseOut]:
     """TRE-04 : Liste les dépenses d'un événement avec filtres et pagination."""
-    
+
     _get_event_or_raise(session, id_event)
 
     if start_date and end_date and start_date > end_date:
-        raise InvalidExpenseError(
-            "La date de début doit précéder la date de fin."
-        )
+        raise InvalidExpenseError("La date de début doit précéder la date de fin.")
 
     expenses = treasury_repo.list_expenses_by_event(
         session,
@@ -223,10 +220,10 @@ def list_expenses(
     return [ExpenseOut.model_validate(expense) for expense in expenses]
 
 
-
 # ============================================================
 # TRE-05 : Modifier une dépense
 # ============================================================
+
 
 def update_expense(
     session: Session,
@@ -237,7 +234,7 @@ def update_expense(
     image_bytes: bytes | None = None,
 ) -> ExpenseOut:
     """TRE-05 : Modifie une dépense existante."""
-    
+
     fund = _get_fund_or_raise(session, id_fund)
 
     if fund.id_event != id_event or fund.amount >= 0:
@@ -273,10 +270,10 @@ def update_expense(
 # TRE-06 : Suivi budgétaire global
 # ============================================================
 
+
 def get_budget_summary(session: Session) -> BudgetSummaryOut:
-    
     """TRE-06 : Calcule le bilan budgétaire global de la trésorerie."""
-    
+
     donations = treasury_repo.get_global_donations_total(session)
     totals = treasury_repo.get_global_fund_totals(session)
 
@@ -284,11 +281,7 @@ def get_budget_summary(session: Session) -> BudgetSummaryOut:
         total_donations=donations,
         total_income=totals["total_income"],
         total_expenses=totals["total_expenses"],
-        balance=(
-            donations
-            + totals["total_income"]
-            - totals["total_expenses"]
-        ),
+        balance=(donations + totals["total_income"] - totals["total_expenses"]),
     )
 
 
@@ -326,38 +319,31 @@ def get_export_data(session: Session, export_type: str) -> dict:
 # TRE-08 : Gains d'une campagne
 # ============================================================
 
+
 def get_campaign_gains(
     session: Session,
     id_campaign: UUID,
 ) -> CampaignGainsOut:
-    
     """TRE-08 : Calcule le bilan financier d'une campagne."""
-    
+
     _get_campaign_or_raise(session, id_campaign)
 
-    donations = treasury_repo.get_campaign_donations_total(
-        session, id_campaign
-    )
-    totals = treasury_repo.get_campaign_fund_totals(
-        session, id_campaign
-    )
+    donations = treasury_repo.get_campaign_donations_total(session, id_campaign)
+    totals = treasury_repo.get_campaign_fund_totals(session, id_campaign)
 
     return CampaignGainsOut(
         id_campaign=id_campaign,
         total_donations=donations,
         total_fund_income=totals["total_fund_income"],
         total_expenses=totals["total_expenses"],
-        balance=(
-            donations
-            + totals["total_fund_income"]
-            - totals["total_expenses"]
-        ),
+        balance=(donations + totals["total_fund_income"] - totals["total_expenses"]),
     )
 
 
 # ============================================================
 # TRE-09 : Gains des campagnes créées hors bénéficiaires.
 # ============================================================
+
 
 def get_system_campaigns_gains(
     session: Session,
@@ -369,13 +355,9 @@ def get_system_campaigns_gains(
     results = []
 
     for campaign in campaigns:
-        donations = treasury_repo.get_campaign_donations_total(
-            session, campaign.id_campaign
-        )
+        donations = treasury_repo.get_campaign_donations_total(session, campaign.id_campaign)
 
-        totals = treasury_repo.get_campaign_fund_totals(
-            session, campaign.id_campaign
-        )
+        totals = treasury_repo.get_campaign_fund_totals(session, campaign.id_campaign)
 
         results.append(
             SystemCampaignGainsOut(
@@ -384,11 +366,7 @@ def get_system_campaigns_gains(
                 total_donations=donations,
                 total_fund_income=totals["total_fund_income"],
                 total_expenses=totals["total_expenses"],
-                balance=(
-                    donations
-                    + totals["total_fund_income"]
-                    - totals["total_expenses"]
-                ),
+                balance=(donations + totals["total_fund_income"] - totals["total_expenses"]),
             )
         )
 
@@ -399,20 +377,19 @@ def get_system_campaigns_gains(
 # TRE-10 : Gains d'un événement d'une campagne.
 # ============================================================
 
+
 def get_campaign_event_gains(
     session: Session,
     id_campaign: UUID,
     id_event: UUID,
 ) -> EventGainsOut:
     """TRE-10 : Calcule les gains et dépenses d'un événement d'une campagne."""
-    
+
     _get_campaign_or_raise(session, id_campaign)
     event = _get_event_or_raise(session, id_event)
 
     if event.id_campaign != id_campaign:
-        raise EventNotFoundError(
-            "Cet événement n'appartient pas à cette campagne."
-        )
+        raise EventNotFoundError("Cet événement n'appartient pas à cette campagne.")
 
     totals = treasury_repo.get_event_fund_totals(session, id_event)
 
@@ -428,17 +405,16 @@ def get_campaign_event_gains(
 # TRE-11 : Total des dons réussis d'une campagne
 # ============================================================
 
+
 def get_campaign_donations_total(
     session: Session,
     id_campaign: UUID,
 ) -> CampaignDonationsTotalOut:
     """TRE-11 : Calcule le total des dons réussis d'une campagne."""
-    
+
     _get_campaign_or_raise(session, id_campaign)
 
-    total = treasury_repo.get_campaign_donations_total(
-        session, id_campaign
-    )
+    total = treasury_repo.get_campaign_donations_total(session, id_campaign)
 
     return CampaignDonationsTotalOut(
         id_campaign=id_campaign,
@@ -446,31 +422,26 @@ def get_campaign_donations_total(
     )
 
 
-
 # ============================================================
 # TRE-12 : Gains cumulés de tous les événements d'une campagne
 # ============================================================
+
 
 def get_campaign_events_gains(
     session: Session,
     id_campaign: UUID,
 ) -> CampaignEventsGainsOut:
     """TRE-12 : Calcule les gains cumulés de tous les événements d'une campagne."""
-    
+
     _get_campaign_or_raise(session, id_campaign)
 
-    totals = treasury_repo.get_campaign_events_fund_totals(
-        session, id_campaign
-    )
+    totals = treasury_repo.get_campaign_events_fund_totals(session, id_campaign)
 
     return CampaignEventsGainsOut(
         id_campaign=id_campaign,
         total_income=totals["total_income"],
         total_expenses=totals["total_expenses"],
-        balance=(
-            totals["total_income"]
-            - totals["total_expenses"]
-        ),
+        balance=(totals["total_income"] - totals["total_expenses"]),
     )
 
 
@@ -479,7 +450,7 @@ def get_event_gains(
     id_event: UUID,
 ) -> EventGainsOut:
     """Calcule le bilan financier d'un événement."""
-    
+
     _get_event_or_raise(session, id_event)
 
     totals = treasury_repo.get_event_fund_totals(session, id_event)
@@ -488,8 +459,5 @@ def get_event_gains(
         id_event=id_event,
         total_income=totals["total_income"],
         total_expenses=totals["total_expenses"],
-        balance=(
-            totals["total_income"]
-            - totals["total_expenses"]
-        ),
+        balance=(totals["total_income"] - totals["total_expenses"]),
     )

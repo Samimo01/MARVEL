@@ -63,9 +63,7 @@ def create_financial_donation(
     return FinancialDonOut.model_validate(donation)
 
 
-def pay_donation(
-    session: Session, *, user: User, id_don_f: UUID
-) -> PaymentInitOut:
+def pay_donation(session: Session, *, user: User, id_don_f: UUID) -> PaymentInitOut:
     donation = _get_or_raise(session, id_don_f)
 
     if donation.status == "Success":
@@ -75,9 +73,7 @@ def pay_donation(
     reference = f"PAY-{uuid.uuid4().hex[:8].upper()}"
     donation.reference_payment = reference
 
-    don_repo.update_donation(
-        session, donation, {"reference_payment": reference}
-    )
+    don_repo.update_donation(session, donation, {"reference_payment": reference})
     session.commit()
 
     return PaymentInitOut(
@@ -87,9 +83,7 @@ def pay_donation(
     )
 
 
-def get_payment_status(
-    session: Session, id_don_f: UUID
-) -> PaymentStatusOut:
+def get_payment_status(session: Session, id_don_f: UUID) -> PaymentStatusOut:
     donation = _get_or_raise(session, id_don_f)
 
     if donation.reference_payment and donation.status != "Success":
@@ -114,16 +108,12 @@ def get_payment_status(
     )
 
 
-def list_my_donations(
-    session: Session, *, user: User
-) -> list[FinancialDonOut]:
+def list_my_donations(session: Session, *, user: User) -> list[FinancialDonOut]:
     dons = don_repo.list_user_donations(session, user.id_user)
     return [FinancialDonOut.model_validate(d) for d in dons]
 
 
-def get_donation_detail(
-    session: Session, id_don_f: UUID
-) -> FinancialDonOut:
+def get_donation_detail(session: Session, id_don_f: UUID) -> FinancialDonOut:
     donation = _get_or_raise(session, id_don_f)
     return FinancialDonOut.model_validate(donation)
 
@@ -132,9 +122,7 @@ def generate_receipt(session: Session, id_don_f: UUID) -> ReceiptOut:
     donation = _get_or_raise(session, id_don_f)
 
     if donation.status != "Success":
-        raise DonationNotSuccessfulError(
-            "Impossible de générer un reçu pour un don non validé."
-        )
+        raise DonationNotSuccessfulError("Impossible de générer un reçu pour un don non validé.")
 
     mock_pdf_url = f"https://mock-storage.com/receipts/{donation.id_don_f}.pdf"
 
@@ -181,23 +169,17 @@ def list_successful_donations_by_campaign(
     return [FinancialDonOut.model_validate(d) for d in dons]
 
 
-def get_campaign_amount_collected(
-    session: Session, id_campaign: UUID
-) -> Decimal:
+def get_campaign_amount_collected(session: Session, id_campaign: UUID) -> Decimal:
     """Expose le calcul du montant collecté pour une campagne."""
     return don_repo.get_campaign_amount_collected(session, id_campaign)
 
 
-def get_campaigns_amounts_collected(
-    session: Session, ids: list[UUID]
-) -> dict[UUID, Decimal]:
+def get_campaigns_amounts_collected(session: Session, ids: list[UUID]) -> dict[UUID, Decimal]:
     """Expose le calcul batch des montants collectés."""
     return don_repo.get_campaigns_amounts_collected(session, ids)
 
 
-def list_campaign_donations(
-    session: Session, id_campaign: UUID
-) -> list[FinancialDonOut]:
+def list_campaign_donations(session: Session, id_campaign: UUID) -> list[FinancialDonOut]:
     """Expose la liste des dons d'une campagne."""
     dons = don_repo.list_donations_by_campaign(session, id_campaign)
     return [FinancialDonOut.model_validate(d) for d in dons]

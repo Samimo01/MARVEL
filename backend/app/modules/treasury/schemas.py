@@ -6,10 +6,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
 # ============================================================
 # Opérations financières
 # ============================================================
+
 
 class FundOut(BaseModel):
     """TRE-02 : Détail d'une opération financière."""
@@ -28,6 +28,7 @@ class FundOut(BaseModel):
 # ============================================================
 # Dépenses
 # ============================================================
+
 
 class ExpenseCreate(BaseModel):
     """TRE-03 : Enregistrement d'une dépense."""
@@ -71,6 +72,7 @@ class ExpenseOut(BaseModel):
 # Suivi budgétaire
 # ============================================================
 
+
 class BudgetSummaryOut(BaseModel):
     """TRE-06 : Bilan budgétaire."""
 
@@ -84,8 +86,9 @@ class BudgetSummaryOut(BaseModel):
 # Gains des campagnes
 # ============================================================
 
+
 class CampaignGainsOut(BaseModel):
-    """	TRE-08 : Bilan financier d'une campagne."""
+    """TRE-08 : Bilan financier d'une campagne."""
 
     id_campaign: UUID
     total_donations: Decimal
@@ -105,6 +108,7 @@ class CampaignDonationsTotalOut(BaseModel):
 # Gains des événements
 # ============================================================
 
+
 class EventGainsOut(BaseModel):
     """TRE-10 : Bilan financier d'un événement."""
 
@@ -112,7 +116,7 @@ class EventGainsOut(BaseModel):
     total_income: Decimal
     total_expenses: Decimal
     balance: Decimal
-    
+
 
 class CampaignEventsGainsOut(BaseModel):
     """TRE-12 : Gains cumulés de tous les événements d'une campagne."""

@@ -9,6 +9,8 @@ from app.modules.campaigns.router import (
     campaign_catalog_router,
     event_catalog_router,
     events_router,
+)
+from app.modules.campaigns.router import (
     router as campaigns_router,
 )
 from app.modules.dashboard.router import router as dashboard_router
@@ -18,6 +20,8 @@ from app.modules.financial_donations.router import (
 )
 from app.modules.natural_donations.router import (
     admin_router as natural_admin_router,
+)
+from app.modules.natural_donations.router import (
     router as natural_donations_router,
 )
 from app.modules.receipts.router import router as receipts_router

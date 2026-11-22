@@ -29,9 +29,7 @@ role_assignment_type = ENUM(
 class User(Base):
     __tablename__ = "users"
 
-    id_user: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid4
-    )
+    id_user: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     firstname: Mapped[str] = mapped_column(String, nullable=False)
     lastname: Mapped[str] = mapped_column(String, nullable=False)
     nickname: Mapped[str | None] = mapped_column(String, unique=True)
@@ -59,9 +57,7 @@ class User(Base):
 class Role(Base):
     __tablename__ = "roles"
 
-    id_role: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid4
-    )
+    id_role: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     role_name: Mapped[str] = mapped_column(role_name_type, nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

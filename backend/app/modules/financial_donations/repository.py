@@ -83,18 +83,14 @@ def add_donation(session: Session, donation: FinancialDon) -> None:
     session.flush()
 
 
-def update_donation(
-    session: Session, donation: FinancialDon, data: dict
-) -> FinancialDon:
+def update_donation(session: Session, donation: FinancialDon, data: dict) -> FinancialDon:
     for field, value in data.items():
         setattr(donation, field, value)
     session.flush()
     return donation
 
 
-def get_campaign_amount_collected(
-    session: Session, id_campaign: UUID
-) -> Decimal:
+def get_campaign_amount_collected(session: Session, id_campaign: UUID) -> Decimal:
     """Calcule la somme des dons réussis pour UNE campagne."""
     total = session.scalar(
         select(
@@ -110,9 +106,7 @@ def get_campaign_amount_collected(
     return Decimal(total or 0).quantize(Decimal("0.01"))
 
 
-def get_campaigns_amounts_collected(
-    session: Session, ids: list[UUID]
-) -> dict[UUID, Decimal]:
+def get_campaigns_amounts_collected(session: Session, ids: list[UUID]) -> dict[UUID, Decimal]:
     """Calcule la somme des dons réussis pour PLUSIEURS campagnes (Batch)."""
     if not ids:
         return {}
@@ -130,15 +124,10 @@ def get_campaigns_amounts_collected(
         )
         .group_by(FinancialDon.id_campaign)
     ).all()
-    return {
-        row[0]: Decimal(row[1] or 0).quantize(Decimal("0.01"))
-        for row in rows
-    }
+    return {row[0]: Decimal(row[1] or 0).quantize(Decimal("0.01")) for row in rows}
 
 
-def list_donations_by_campaign(
-    session: Session, id_campaign: UUID
-) -> list[FinancialDon]:
+def list_donations_by_campaign(session: Session, id_campaign: UUID) -> list[FinancialDon]:
     """Récupère la liste de TOUS les dons d'une campagne."""
     return list(
         session.scalars(

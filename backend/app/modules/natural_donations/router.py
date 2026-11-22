@@ -108,9 +108,7 @@ def nat18_toggle_object_type(
 ):
     """NAT-18 : Active ou désactive un type d'objet."""
     try:
-        return don_service.toggle_object_type_activation(
-            session, id_object, is_active
-        )
+        return don_service.toggle_object_type_activation(session, id_object, is_active)
     except ObjectTypeNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
@@ -277,9 +275,7 @@ def nat08_reject_natural_don(
 ):
     """NAT-08 : Refuser un don."""
     try:
-        return don_service.reject_natural_don(
-            session, id_don_n, user, payload
-        )
+        return don_service.reject_natural_don(session, id_don_n, user, payload)
     except NaturalDonNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except InvalidStatusTransitionError as exc:
@@ -298,9 +294,7 @@ def nat09_plan_collect(
 ):
     """NAT-09 : Planifie la collecte."""
     try:
-        return don_service.plan_natural_don_collect(
-            session, id_don_n, user, payload
-        )
+        return don_service.plan_natural_don_collect(session, id_don_n, user, payload)
     except NaturalDonNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except InvalidStatusTransitionError as exc:
@@ -320,9 +314,7 @@ def nat10_update_item_reception(
 ):
     """NAT-10 : Contrôle à la réception."""
     try:
-        return don_service.update_item_reception(
-            session, id_don_n, id_nat, user, payload
-        )
+        return don_service.update_item_reception(session, id_don_n, id_nat, user, payload)
     except NaturalDonNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except ItemNotFoundError as exc:

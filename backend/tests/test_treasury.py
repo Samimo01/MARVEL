@@ -11,15 +11,15 @@ from app.database import Base
 from app.modules.auth.models import Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign, Event
 from app.modules.financial_donations.models import FinancialDon
-from app.modules.treasury.models import Fund
 from app.modules.treasury import repository as repo
 from app.modules.treasury import service
+from app.modules.treasury.models import Fund
 from app.modules.treasury.schemas import ExpenseCreate, ExpenseUpdate
-
 
 # ============================================================
 # FIXTURES
 # ============================================================
+
 
 @pytest.fixture
 def db():
@@ -120,10 +120,9 @@ def add_donation(db, campaign_id, user_id, amount, status="Success"):
 # REPOSITORY : LECTURE DES OPÉRATIONS
 # ============================================================
 
+
 def test_get_fund_by_id(db, data):
-    fund = add_fund(
-        db, data["event"].id_event, data["user"].id_user, -100
-    )
+    fund = add_fund(db, data["event"].id_event, data["user"].id_user, -100)
 
     result = repo.get_fund_by_id(db, fund.id_fund)
 
@@ -140,11 +139,17 @@ def test_list_all_funds_ordered_by_date(db, data):
     user_id = data["user"].id_user
 
     older = add_fund(
-        db, event_id, user_id, -100,
+        db,
+        event_id,
+        user_id,
+        -100,
         date=datetime(2026, 1, 1),
     )
     newer = add_fund(
-        db, event_id, user_id, -200,
+        db,
+        event_id,
+        user_id,
+        -200,
         date=datetime(2026, 1, 15),
     )
 
@@ -160,11 +165,19 @@ def test_list_expenses_by_event(db, data):
     user_id = data["user"].id_user
 
     expense1 = add_fund(
-        db, event_id, user_id, -100, "Transport",
+        db,
+        event_id,
+        user_id,
+        -100,
+        "Transport",
         datetime(2026, 1, 5),
     )
     expense2 = add_fund(
-        db, event_id, user_id, -200, "Achat",
+        db,
+        event_id,
+        user_id,
+        -200,
+        "Achat",
         datetime(2026, 1, 10),
     )
     add_fund(db, event_id, user_id, 300, "Revenu")
@@ -184,9 +197,7 @@ def test_list_expenses_with_category_filter(db, data):
     add_fund(db, event_id, user_id, -100, "Transport")
     expected = add_fund(db, event_id, user_id, -200, "Achat")
 
-    result = repo.list_expenses_by_event(
-        db, event_id, category="Achat"
-    )
+    result = repo.list_expenses_by_event(db, event_id, category="Achat")
 
     assert len(result) == 1
     assert result[0].id_fund == expected.id_fund
@@ -197,15 +208,24 @@ def test_list_expenses_with_date_filters(db, data):
     user_id = data["user"].id_user
 
     add_fund(
-        db, event_id, user_id, -100,
+        db,
+        event_id,
+        user_id,
+        -100,
         date=datetime(2026, 1, 1),
     )
     expected = add_fund(
-        db, event_id, user_id, -200,
+        db,
+        event_id,
+        user_id,
+        -200,
         date=datetime(2026, 1, 10),
     )
     add_fund(
-        db, event_id, user_id, -300,
+        db,
+        event_id,
+        user_id,
+        -300,
         date=datetime(2026, 1, 20),
     )
 
@@ -233,9 +253,7 @@ def test_list_expenses_with_pagination(db, data):
             date=datetime(2026, 1, day),
         )
 
-    result = repo.list_expenses_by_event(
-        db, event_id, limit=2, offset=1
-    )
+    result = repo.list_expenses_by_event(db, event_id, limit=2, offset=1)
 
     assert len(result) == 2
     assert result[0].amount == Decimal("-300.00")
@@ -245,6 +263,7 @@ def test_list_expenses_with_pagination(db, data):
 # ============================================================
 # REPOSITORY : ÉCRITURE
 # ============================================================
+
 
 def test_add_fund(db, data):
     fund = Fund(
@@ -262,9 +281,7 @@ def test_add_fund(db, data):
 
 
 def test_update_fund_repository(db, data):
-    fund = add_fund(
-        db, data["event"].id_event, data["user"].id_user, -100
-    )
+    fund = add_fund(db, data["event"].id_event, data["user"].id_user, -100)
 
     result = repo.update_fund(
         db,
@@ -278,6 +295,7 @@ def test_update_fund_repository(db, data):
 # ============================================================
 # REPOSITORY : AGRÉGATS GLOBAUX
 # ============================================================
+
 
 def test_get_global_donations_total(db, data):
     campaign_id = data["campaign"].id_campaign
@@ -309,6 +327,7 @@ def test_get_global_fund_totals(db, data):
 # ============================================================
 # REPOSITORY : AGRÉGATS PAR CAMPAGNE
 # ============================================================
+
 
 def test_get_campaign_donations_total(db, data):
     campaign_id = data["campaign"].id_campaign
@@ -355,6 +374,7 @@ def test_get_campaign_events_fund_totals(db, data):
 # REPOSITORY : AGRÉGATS PAR ÉVÉNEMENT
 # ============================================================
 
+
 def test_get_event_fund_totals(db, data):
     event_id = data["event"].id_event
     user_id = data["user"].id_user
@@ -376,9 +396,7 @@ def test_get_event_by_id(db, data):
 
 
 def test_get_campaign_by_id(db, data):
-    campaign = repo.get_campaign_by_id(
-        db, data["campaign"].id_campaign
-    )
+    campaign = repo.get_campaign_by_id(db, data["campaign"].id_campaign)
 
     assert campaign is not None
     assert campaign.id_campaign == data["campaign"].id_campaign
@@ -426,6 +444,7 @@ def test_list_system_campaigns(db, data):
 # REPOSITORY : EXPORT
 # ============================================================
 
+
 def test_list_all_expenses(db, data):
     event_id = data["event"].id_event
     user_id = data["user"].id_user
@@ -456,10 +475,9 @@ def test_list_successful_donations(db, data):
 # SERVICE : TRE-01 ET TRE-02
 # ============================================================
 
+
 def test_service_list_funds(db, data):
-    fund = add_fund(
-        db, data["event"].id_event, data["user"].id_user, -100
-    )
+    fund = add_fund(db, data["event"].id_event, data["user"].id_user, -100)
 
     result = service.list_funds(db)
 
@@ -468,9 +486,7 @@ def test_service_list_funds(db, data):
 
 
 def test_service_get_fund_detail(db, data):
-    fund = add_fund(
-        db, data["event"].id_event, data["user"].id_user, -100
-    )
+    fund = add_fund(db, data["event"].id_event, data["user"].id_user, -100)
 
     result = service.get_fund_detail(db, fund.id_fund)
 
@@ -485,6 +501,7 @@ def test_service_get_fund_detail_not_found(db):
 # ============================================================
 # SERVICE : TRE-03 - CRÉER UNE DÉPENSE
 # ============================================================
+
 
 def test_service_create_expense(db, data):
     payload = ExpenseCreate(
@@ -568,10 +585,9 @@ def test_service_create_expense_with_image(db, data, monkeypatch):
 # SERVICE : TRE-04 - LISTE DES DÉPENSES
 # ============================================================
 
+
 def test_service_list_expenses(db, data):
-    expected = add_fund(
-        db, data["event"].id_event, data["user"].id_user, -100
-    )
+    expected = add_fund(db, data["event"].id_event, data["user"].id_user, -100)
 
     result = service.list_expenses(db, data["event"].id_event)
 
@@ -597,6 +613,7 @@ def test_service_list_expenses_event_not_found(db):
 # ============================================================
 # SERVICE : MODIFICATION D'UNE DÉPENSE
 # ============================================================
+
 
 def test_service_update_expense(db, data):
     fund = add_fund(
@@ -723,6 +740,7 @@ def test_service_update_expense_with_image(db, data, monkeypatch):
 # SERVICE : TRE-06 - BILAN GLOBAL
 # ============================================================
 
+
 def test_service_get_budget_summary(db, data):
     campaign_id = data["campaign"].id_campaign
     event_id = data["event"].id_event
@@ -743,6 +761,7 @@ def test_service_get_budget_summary(db, data):
 # ============================================================
 # SERVICE : TRE-07 - EXPORT
 # ============================================================
+
 
 def test_service_get_export_data_all(db, data):
     campaign_id = data["campaign"].id_campaign
@@ -767,9 +786,7 @@ def test_service_get_export_data_budget_only(db):
 
 
 def test_service_get_export_data_operations_only(db, data):
-    add_fund(
-        db, data["event"].id_event, data["user"].id_user, -100
-    )
+    add_fund(db, data["event"].id_event, data["user"].id_user, -100)
 
     result = service.get_export_data(db, "operations")
 
@@ -781,6 +798,7 @@ def test_service_get_export_data_operations_only(db, data):
 # ============================================================
 # SERVICE : TRE-08 - GAINS D'UNE CAMPAGNE
 # ============================================================
+
 
 def test_service_get_campaign_gains(db, data):
     campaign_id = data["campaign"].id_campaign
@@ -808,6 +826,7 @@ def test_service_get_campaign_gains_not_found(db):
 # SERVICE : TRE-09 - GAINS DES CAMPAGNES SYSTÈME
 # ============================================================
 
+
 def test_service_get_system_campaigns_gains(db, data):
     result = service.get_system_campaigns_gains(db)
 
@@ -820,6 +839,7 @@ def test_service_get_system_campaigns_gains(db, data):
 # SERVICE : TRE-10 - GAINS D'UN ÉVÉNEMENT
 # ============================================================
 
+
 def test_service_get_campaign_event_gains(db, data):
     event_id = data["event"].id_event
     campaign_id = data["campaign"].id_campaign
@@ -828,9 +848,7 @@ def test_service_get_campaign_event_gains(db, data):
     add_fund(db, event_id, user_id, 300)
     add_fund(db, event_id, user_id, -100)
 
-    result = service.get_campaign_event_gains(
-        db, campaign_id, event_id
-    )
+    result = service.get_campaign_event_gains(db, campaign_id, event_id)
 
     assert result.total_income == Decimal("300.00")
     assert result.total_expenses == Decimal("100.00")
@@ -857,6 +875,7 @@ def test_service_get_campaign_event_gains_wrong_campaign(db, data):
 # SERVICE : TRE-11 - TOTAL DES DONS D'UNE CAMPAGNE
 # ============================================================
 
+
 def test_service_get_campaign_donations_total(db, data):
     campaign_id = data["campaign"].id_campaign
     user_id = data["user"].id_user
@@ -872,6 +891,7 @@ def test_service_get_campaign_donations_total(db, data):
 # ============================================================
 # SERVICE : TRE-12 - GAINS CUMULÉS DES ÉVÉNEMENTS
 # ============================================================
+
 
 def test_service_get_campaign_events_gains(db, data):
     event_id = data["event"].id_event
@@ -891,6 +911,7 @@ def test_service_get_campaign_events_gains(db, data):
 # ============================================================
 # SERVICE : BILAN D'UN ÉVÉNEMENT
 # ============================================================
+
 
 def test_service_get_event_gains(db, data):
     event_id = data["event"].id_event

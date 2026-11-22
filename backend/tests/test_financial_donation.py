@@ -114,15 +114,11 @@ def _create_test_campaign(client: TestClient, headers: dict) -> str:
 
 def test_create_financial_donation_success(donations_client) -> None:
     client, test_session = donations_client
-    admin_id, admin_token = _register_test_user(
-        client, "admin_don@example.com"
-    )
+    admin_id, admin_token = _register_test_user(client, "admin_don@example.com")
     _assign_administrator_role(test_session, admin_id)
 
     user_id, user_token = _register_test_user(client, "donor@example.com")
-    campaign_id = _create_test_campaign(
-        client, {"Authorization": f"Bearer {admin_token}"}
-    )
+    campaign_id = _create_test_campaign(client, {"Authorization": f"Bearer {admin_token}"})
 
     headers = {"Authorization": f"Bearer {user_token}"}
     payload = {
@@ -130,9 +126,7 @@ def test_create_financial_donation_success(donations_client) -> None:
         "id_campaign": campaign_id,
         "is_anonymous": False,
     }
-    response = client.post(
-        "/api/v1/dons/financiers", json=payload, headers=headers
-    )
+    response = client.post("/api/v1/dons/financiers", json=payload, headers=headers)
 
     assert response.status_code == 201
     assert response.json()["amount"] == "500.00"
@@ -143,15 +137,11 @@ def test_create_financial_donation_success(donations_client) -> None:
 
 def test_pay_and_check_status(donations_client) -> None:
     client, test_session = donations_client
-    admin_id, admin_token = _register_test_user(
-        client, "admin_don2@example.com"
-    )
+    admin_id, admin_token = _register_test_user(client, "admin_don2@example.com")
     _assign_administrator_role(test_session, admin_id)
     _, user_token = _register_test_user(client, "donor2@example.com")
 
-    campaign_id = _create_test_campaign(
-        client, {"Authorization": f"Bearer {admin_token}"}
-    )
+    campaign_id = _create_test_campaign(client, {"Authorization": f"Bearer {admin_token}"})
     headers = {"Authorization": f"Bearer {user_token}"}
 
     don_res = client.post(
@@ -165,30 +155,22 @@ def test_pay_and_check_status(donations_client) -> None:
     )
     don_id = don_res.json()["id_don_f"]
 
-    pay_res = client.post(
-        f"/api/v1/dons/financiers/{don_id}/pay", headers=headers
-    )
+    pay_res = client.post(f"/api/v1/dons/financiers/{don_id}/pay", headers=headers)
     assert pay_res.status_code == 200
     assert "mock-payment-gateway.com" in pay_res.json()["payment_url"]
 
-    status_res = client.get(
-        f"/api/v1/dons/financiers/{don_id}/payment-status", headers=headers
-    )
+    status_res = client.get(f"/api/v1/dons/financiers/{don_id}/payment-status", headers=headers)
     assert status_res.status_code == 200
     assert status_res.json()["status"] == "Success"
 
 
 def test_get_donation_detail_and_receipt(donations_client) -> None:
     client, test_session = donations_client
-    admin_id, admin_token = _register_test_user(
-        client, "admin_don4@example.com"
-    )
+    admin_id, admin_token = _register_test_user(client, "admin_don4@example.com")
     _assign_administrator_role(test_session, admin_id)
     _, user_token = _register_test_user(client, "donor4@example.com")
 
-    campaign_id = _create_test_campaign(
-        client, {"Authorization": f"Bearer {admin_token}"}
-    )
+    campaign_id = _create_test_campaign(client, {"Authorization": f"Bearer {admin_token}"})
     user_headers = {"Authorization": f"Bearer {user_token}"}
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
@@ -207,22 +189,16 @@ def test_get_donation_detail_and_receipt(donations_client) -> None:
     assert detail.status_code == 200
     assert detail.json()["is_anonymous"] is True
 
-    receipt_fail = client.post(
-        f"/api/v1/dons/{don_id}/receipt", headers=admin_headers
-    )
+    receipt_fail = client.post(f"/api/v1/dons/{don_id}/receipt", headers=admin_headers)
     assert receipt_fail.status_code == 400
 
-    client.post(
-        f"/api/v1/dons/financiers/{don_id}/pay", headers=user_headers
-    )
+    client.post(f"/api/v1/dons/financiers/{don_id}/pay", headers=user_headers)
     client.get(
         f"/api/v1/dons/financiers/{don_id}/payment-status",
         headers=user_headers,
     )
 
-    receipt_ok = client.post(
-        f"/api/v1/dons/{don_id}/receipt", headers=admin_headers
-    )
+    receipt_ok = client.post(f"/api/v1/dons/{don_id}/receipt", headers=admin_headers)
     assert receipt_ok.status_code == 200
     assert "mock-storage.com" in receipt_ok.json()["receipt_url"]
 
@@ -234,15 +210,11 @@ def test_get_donation_detail_and_receipt(donations_client) -> None:
 
 def test_don04_list_my_donations(donations_client) -> None:
     client, test_session = donations_client
-    admin_id, admin_token = _register_test_user(
-        client, "admin_don_me@example.com"
-    )
+    admin_id, admin_token = _register_test_user(client, "admin_don_me@example.com")
     _assign_administrator_role(test_session, admin_id)
     _, user_token = _register_test_user(client, "donor_me@example.com")
 
-    campaign_id = _create_test_campaign(
-        client, {"Authorization": f"Bearer {admin_token}"}
-    )
+    campaign_id = _create_test_campaign(client, {"Authorization": f"Bearer {admin_token}"})
     user_headers = {"Authorization": f"Bearer {user_token}"}
 
     res1 = client.post(
@@ -282,18 +254,12 @@ def test_don04_list_my_donations(donations_client) -> None:
 def test_don07_list_all_donations_with_filters(donations_client) -> None:
     """DON-07 : Tester la liste globale avec filtres."""
     client, test_session = donations_client
-    admin_id, admin_token = _register_test_user(
-        client, "admin_don_all@example.com"
-    )
+    admin_id, admin_token = _register_test_user(client, "admin_don_all@example.com")
     _assign_administrator_role(test_session, admin_id)
     _, user_token = _register_test_user(client, "donor_all@example.com")
 
-    campaign1 = _create_test_campaign(
-        client, {"Authorization": f"Bearer {admin_token}"}
-    )
-    campaign2 = _create_test_campaign(
-        client, {"Authorization": f"Bearer {admin_token}"}
-    )
+    campaign1 = _create_test_campaign(client, {"Authorization": f"Bearer {admin_token}"})
+    campaign2 = _create_test_campaign(client, {"Authorization": f"Bearer {admin_token}"})
 
     user_headers = {"Authorization": f"Bearer {user_token}"}
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -314,23 +280,15 @@ def test_don07_list_all_donations_with_filters(donations_client) -> None:
         "is_anonymous": False,
     }
 
-    client.post(
-        "/api/v1/dons/financiers", json=payload_10, headers=user_headers
-    )
-    client.post(
-        "/api/v1/dons/financiers", json=payload_20, headers=user_headers
-    )
-    client.post(
-        "/api/v1/dons/financiers", json=payload_30, headers=user_headers
-    )
+    client.post("/api/v1/dons/financiers", json=payload_10, headers=user_headers)
+    client.post("/api/v1/dons/financiers", json=payload_20, headers=user_headers)
+    client.post("/api/v1/dons/financiers", json=payload_30, headers=user_headers)
 
     res_all = client.get("/api/v1/dons", headers=admin_headers)
     assert res_all.status_code == 200
     assert len(res_all.json()) == 3
 
-    res_filtered = client.get(
-        f"/api/v1/dons?id_campaign={campaign1}", headers=admin_headers
-    )
+    res_filtered = client.get(f"/api/v1/dons?id_campaign={campaign1}", headers=admin_headers)
     assert res_filtered.status_code == 200
     assert len(res_filtered.json()) == 2
 
@@ -340,15 +298,11 @@ def test_don09_list_successful_donations_by_campaign(
 ) -> None:
     """DON-09 : Tous les dons réussis d'une campagne."""
     client, test_session = donations_client
-    admin_id, admin_token = _register_test_user(
-        client, "admin_don_camp@example.com"
-    )
+    admin_id, admin_token = _register_test_user(client, "admin_don_camp@example.com")
     _assign_administrator_role(test_session, admin_id)
     _, user_token = _register_test_user(client, "donor_camp@example.com")
 
-    campaign_id = _create_test_campaign(
-        client, {"Authorization": f"Bearer {admin_token}"}
-    )
+    campaign_id = _create_test_campaign(client, {"Authorization": f"Bearer {admin_token}"})
     user_headers = {"Authorization": f"Bearer {user_token}"}
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
@@ -380,9 +334,7 @@ def test_don09_list_successful_donations_by_campaign(
         headers=user_headers,
     )
 
-    response = client.get(
-        f"/api/v1/dons/{campaign_id}/succeed", headers=admin_headers
-    )
+    response = client.get(f"/api/v1/dons/{campaign_id}/succeed", headers=admin_headers)
 
     assert response.status_code == 200
     assert len(response.json()) == 1
