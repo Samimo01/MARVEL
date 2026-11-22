@@ -126,3 +126,22 @@ def require_volunteer(
         )
 
     return user
+
+
+def require_treasury_staff(
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> User:
+    """Autorise les trésoriers et les administrateurs."""
+    for role_name in ("Treasurer", "Administrator"):
+        assignment = auth_repo.get_latest_role_assignment(
+            session, user.id_user, role_name
+        )
+
+        if assignment is not None and assignment.assignment_type == "assigned":
+            return user
+
+    raise HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        "Rôle requis : Treasurer ou Administrator.",
+    )
