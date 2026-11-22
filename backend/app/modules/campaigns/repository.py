@@ -1,10 +1,9 @@
 """AccÃ¨s aux donnÃ©es du module campaigns."""
 
 from datetime import datetime
-from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select, cast, Numeric
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.modules.campaigns.models import Campaign, Event
@@ -106,7 +105,7 @@ def publish_campaign(session: Session, campaign: Campaign) -> Campaign:
 
 def deactivate_campaign(session: Session, campaign: Campaign) -> Campaign:
     """Repasse une campagne en brouillon (invisible)."""
-    campaign.status = "Draft"
+    campaign.status = "Invisible"
     session.flush()
     return campaign
 

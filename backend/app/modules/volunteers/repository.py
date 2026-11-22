@@ -3,11 +3,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select, func, table, column
+from sqlalchemy import column, func, select, table
 from sqlalchemy.orm import Session
 
 from app.modules.volunteers.models import Mission, SignIn
-
 
 # Références légères aux tables existantes de Supabase.
 collects_table = table(

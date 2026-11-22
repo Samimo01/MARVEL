@@ -42,8 +42,12 @@ from app.modules.auth.service import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 admin_router = APIRouter(prefix="/admin", tags=["admin roles"])
-DbSession = Annotated[Session, Depends(get_db)]
 users_router = APIRouter(prefix="/users", tags=["users"])
+
+DbSession = Annotated[Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+AdminUser = Annotated[User, Depends(require_administrator)]
+
 
 @router.post("/login", response_model=AuthResponse)
 def login(
@@ -72,7 +76,7 @@ def logout(
     response: Response,
     token: Annotated[str, Depends(get_access_token)],
     db: DbSession,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: CurrentUser,
 ) -> LogoutResponse:
     service.revoke_access_token(
         db,
@@ -105,26 +109,26 @@ async def register(
     db: DbSession,
     image: Annotated[
         UploadFile | None,
-        File(description="Photo de profil facultative"),
+        File(description="Photo de profil (optionnelle)"),
     ] = None,
 ) -> RegistrationResponse:
-    image_bytes = None
-    if image is not None:
-        if image.content_type is None or not image.content_type.startswith("image/"):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                "Le fichier fourni n'est pas une image.",
-            )
-        image_bytes = await image.read()
-
+    image_bytes = await image.read() if image is not None else None
+    if image_bytes is not None and not (image.content_type or "").startswith(
+        "image/"
+    ):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
     try:
         user, access_token = service.register_user(
-            db,
-            payload,
-            image_bytes=image_bytes,
+            db, payload, image_bytes=image_bytes
         )
     except DuplicateAccountError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ImageAlreadyExistsError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
     set_access_token_cookie(response, access_token, persistent=True)
     return RegistrationResponse(
         message="Compte créé.",
@@ -135,7 +139,7 @@ async def register(
 
 
 @admin_router.get("/roles", response_model=list[RoleName])
-def list_roles(admin: User = Depends(require_administrator)) -> list[RoleName]:
+def list_roles(admin: AdminUser) -> list[RoleName]:
     return list(RoleName)
 
 
@@ -143,10 +147,10 @@ def list_roles(admin: User = Depends(require_administrator)) -> list[RoleName]:
     "/users/{id_user}/roles",
     response_model=list[RoleAssignmentResponse],
 )
-def list_user_roles(
+def list_user_role_assignments(
     id_user: UUID,
     db: DbSession,
-    admin: User = Depends(require_administrator),
+    admin: AdminUser,
 ) -> list[RoleAssignmentResponse]:
     try:
         return service.list_user_role_assignments(db, id_user)
@@ -158,41 +162,44 @@ def list_user_roles(
     "/users/{id_user}/roles/{role_name}",
     response_model=RoleAssignmentResponse,
 )
-def set_user_role(
+def assign_role(
     id_user: UUID,
     role_name: RoleName,
     payload: RoleAssignmentRequest,
     db: DbSession,
-    admin: User = Depends(require_administrator),
+    admin: AdminUser,
 ) -> RoleAssignmentResponse:
     try:
         return service.set_user_role_assignment(
-            db, user_id=id_user, role_name=role_name, payload=payload
+            db,
+            user_id=id_user,
+            role_name=role_name,
+            payload=payload,
         )
     except ManagedUserNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except CannotRevokeLastAdministratorError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
-# ============================================================
-# AUT-09 : POST /auth/{id_user}/image (public)
-# ============================================================
-@router.post("/{id_user}/image", response_model=UserOut)
+
+@users_router.post("/{id_user}/image", response_model=UserOut)
 async def aut09_upload_user_image(
     id_user: UUID,
-    image: UploadFile = File(..., description="Photo de profil"),
-    db: DbSession = None,
+    image: Annotated[UploadFile, File(..., description="Photo de profil")],
+    db: DbSession,
 ) -> UserOut:
-    """AUT-09 : Upload public de la photo d'un utilisateur."""
-    if not image.content_type.startswith("image/"):
+    if not (image.content_type or "").startswith("image/"):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "Le fichier fourni n'est pas une image.",
         )
-
     image_bytes = await image.read()
     try:
-        user = service.upload_user_image(db, id_user=id_user, image_bytes=image_bytes)
+        user = service.upload_user_image(
+            db,
+            id_user=id_user,
+            image_bytes=image_bytes,
+        )
         return UserOut.model_validate(user)
     except UserNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
@@ -200,18 +207,18 @@ async def aut09_upload_user_image(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-# ============================================================
-# AUT-10 : PATCH /users/{id_user}/image (authentifié)
-# ============================================================
 @users_router.patch("/{id_user}/image", response_model=UserOut)
 async def aut10_replace_user_image(
     id_user: UUID,
-    image: UploadFile = File(..., description="Nouvelle photo de profil"),
-    db: DbSession = None,
-    current_user: User = Depends(get_current_user),
+    image: Annotated[
+        UploadFile,
+        File(..., description="Nouvelle photo de profil"),
+    ],
+    db: DbSession,
+    current_user: CurrentUser,
 ) -> UserOut:
     """AUT-10 : Remplace la photo d'un utilisateur."""
-    if not image.content_type.startswith("image/"):
+    if not (image.content_type or "").startswith("image/"):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "Le fichier fourni n'est pas une image.",

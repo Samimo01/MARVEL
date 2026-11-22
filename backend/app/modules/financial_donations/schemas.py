@@ -28,6 +28,7 @@ class FinancialDonOut(BaseModel):
     status: str
     failure_reason: str | None
     reference_payment: str | None
+    paid_at: datetime | None = None
     created_at: datetime
     id_user: UUID | None
     id_campaign: UUID
@@ -48,6 +49,7 @@ class PaymentStatusOut(BaseModel):
     id_don_f: UUID
     status: str
     reference_payment: str | None
+    paid_at: datetime | None = None
 
 
 class ReceiptOut(BaseModel):

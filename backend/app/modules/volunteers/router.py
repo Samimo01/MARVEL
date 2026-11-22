@@ -1,40 +1,40 @@
 """Routes REST du module volunteers."""
 
 from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
 from app.core.dependencies import (
     get_current_user,
     require_campaign_editor,
     require_volunteer,
 )
-from app.modules.auth.models import User
+from app.database import get_db
 from app.modules.auth import repository as auth_repo
-
+from app.modules.auth.models import User
 from app.modules.volunteers import service
 from app.modules.volunteers.schemas import (
     MissionCreate,
-    MissionUpdate,
-    MissionResponse,
     MissionDetailResponse,
+    MissionRegistrationResponse,
+    MissionResponse,
+    MissionUpdate,
+    MySignInResponse,
     SignInResponse,
     SignInValidation,
-    MissionRegistrationResponse,
-    MySignInResponse,
     VolunteerSpaceResponse,
 )
 
-
 router = APIRouter(tags=["Missions"])
 
+DbSession = Annotated[Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+CampaignEditor = Annotated[User, Depends(require_campaign_editor)]
+Volunteer = Annotated[User, Depends(require_volunteer)]
 
-# =========================
-# PERMISSIONS
-# =========================
 
 def has_active_role(session: Session, user: User, role: str) -> bool:
     assignment = auth_repo.get_latest_role_assignment(
@@ -49,11 +49,10 @@ def has_active_role(session: Session, user: User, role: str) -> bool:
 
 
 def require_mission_reader(
-    user: User = Depends(get_current_user),
-    session: Session = Depends(get_db),
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
 ) -> User:
     """Autorise Volunteer, Collection_Manager et Administrator."""
-
     for role in ("Volunteer", "Collection_Manager", "Administrator"):
         if has_active_role(session, user, role):
             return user
@@ -64,9 +63,8 @@ def require_mission_reader(
     )
 
 
-# =========================
-# FORMATS DE RÉPONSE
-# =========================
+MissionReader = Annotated[User, Depends(require_mission_reader)]
+
 
 def mission_response(db: Session, mission) -> dict:
     result = MissionResponse.model_validate(mission).model_dump()
@@ -76,8 +74,6 @@ def mission_response(db: Session, mission) -> dict:
 
 
 def my_sign_in_response(db: Session, registration: dict) -> dict:
-    """Formate une inscription avec sa mission."""
-
     return {
         "sign_in": registration["sign_in"],
         "mission": mission_response(db, registration["mission"]),
@@ -88,28 +84,18 @@ def my_sign_in_response(db: Session, registration: dict) -> dict:
 def handle_service_error(exc: Exception):
     if isinstance(exc, service.MissionNotFoundError):
         raise HTTPException(404, str(exc))
-
     if isinstance(exc, service.SignInNotFoundError):
         raise HTTPException(404, str(exc))
-
     if isinstance(exc, service.InvalidMissionStatusError):
         raise HTTPException(409, str(exc))
-
     if isinstance(exc, service.MissionCapacityError):
         raise HTTPException(409, str(exc))
-
     if isinstance(exc, service.DuplicateSignInError):
         raise HTTPException(409, str(exc))
-
     if isinstance(exc, service.InvalidMissionDataError):
         raise HTTPException(400, str(exc))
-
     raise exc
 
-
-# =========================
-# MIS-01 : CRÉER UNE MISSION
-# =========================
 
 @router.post(
     "/missions",
@@ -120,23 +106,16 @@ def handle_service_error(exc: Exception):
 )
 def create_mission(
     payload: MissionCreate,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
 ):
     try:
-        mission = service.create_mission(
-            db,
-            payload.model_dump(),
-        )
+        mission = service.create_mission(db, payload.model_dump())
         return mission_response(db, mission)
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-02 : LISTE DES MISSIONS
-# =========================
 
 @router.get(
     "/missions",
@@ -145,18 +124,17 @@ def create_mission(
     response_model=list[MissionResponse],
 )
 def list_missions(
-    mission_status: str | None = Query(default=None, alias="status"),
-    date_from: datetime | None = Query(default=None),
-    date_to: datetime | None = Query(default=None),
-    db: Session = Depends(get_db),
-    user: User = Depends(require_mission_reader),
+    db: DbSession,
+    user: MissionReader,
+    mission_status: Annotated[str | None, Query(alias="status")] = None,
+    date_from: Annotated[datetime | None, Query()] = None,
+    date_to: Annotated[datetime | None, Query()] = None,
 ):
     try:
         is_staff = (
             has_active_role(db, user, "Collection_Manager")
             or has_active_role(db, user, "Administrator")
         )
-
         missions = service.list_missions(
             db,
             status=mission_status,
@@ -164,19 +142,10 @@ def list_missions(
             date_to=date_to,
             published_only=not is_staff,
         )
-
-        return [
-            mission_response(db, mission)
-            for mission in missions
-        ]
-
+        return [mission_response(db, mission) for mission in missions]
     except Exception as exc:
         handle_service_error(exc)
 
-
-# =========================
-# MIS-03 : DÉTAIL D'UNE MISSION
-# =========================
 
 @router.get(
     "/missions/{mission_id}",
@@ -185,24 +154,17 @@ def list_missions(
 )
 def get_mission(
     mission_id: UUID,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_mission_reader),
+    db: DbSession,
+    user: MissionReader,
 ):
     try:
         result = service.get_mission_detail(db, mission_id)
-
         mission_data = mission_response(db, result["mission"])
         mission_data["remaining_seats"] = result["remaining_seats"]
-
         return mission_data
-
     except Exception as exc:
         handle_service_error(exc)
 
-
-# =========================
-# MIS-04 : MODIFIER UNE MISSION
-# =========================
 
 @router.put(
     "/missions/{mission_id}",
@@ -212,8 +174,8 @@ def get_mission(
 def update_mission(
     mission_id: UUID,
     payload: MissionUpdate,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
 ):
     try:
         mission = service.update_mission(
@@ -222,15 +184,10 @@ def update_mission(
             payload.model_dump(exclude_unset=True),
         )
         return mission_response(db, mission)
-
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-05 : SUPPRIMER UNE MISSION
-# =========================
 
 @router.delete(
     "/missions/{mission_id}",
@@ -240,21 +197,16 @@ def update_mission(
 )
 def delete_mission(
     mission_id: UUID,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
 ):
     try:
         service.delete_mission(db, mission_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-06 : PUBLIER UNE MISSION
-# =========================
 
 @router.post(
     "/missions/{mission_id}/publish",
@@ -264,21 +216,16 @@ def delete_mission(
 )
 def publish_mission(
     mission_id: UUID,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
 ):
     try:
         mission = service.publish_mission(db, mission_id)
         return mission_response(db, mission)
-
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-07 : TERMINER UNE MISSION
-# =========================
 
 @router.post(
     "/missions/{mission_id}/complete",
@@ -287,21 +234,16 @@ def publish_mission(
 )
 def complete_mission(
     mission_id: UUID,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
 ):
     try:
         mission = service.complete_mission(db, mission_id)
         return mission_response(db, mission)
-
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-08 : ANNULER UNE MISSION
-# =========================
 
 @router.post(
     "/missions/{mission_id}/cancel",
@@ -310,47 +252,33 @@ def complete_mission(
 )
 def cancel_mission(
     mission_id: UUID,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
 ):
     try:
         mission = service.cancel_mission(db, mission_id)
         return mission_response(db, mission)
-
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-09 : PLANNING
-# =========================
 
 @router.get(
     "/planning",
     summary="Mis09  Consulter le planning des missions",
 )
 def get_planning(
-    date_from: datetime = Query(alias="from"),
-    date_to: datetime = Query(alias="to"),
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
+    date_from: Annotated[datetime, Query(alias="from")],
+    date_to: Annotated[datetime, Query(alias="to")],
 ):
     try:
-        results = service.get_planning(
-            db,
-            date_from,
-            date_to,
-        )
+        results = service.get_planning(db, date_from, date_to)
 
         planning = []
-
         for item in results:
-            mission_data = mission_response(
-                db,
-                item["mission"],
-            )
-
+            mission_data = mission_response(db, item["mission"])
             planning.append({
                 **mission_data,
                 "remaining_seats": item["remaining_seats"],
@@ -359,17 +287,10 @@ def get_planning(
                     for sign_in in item["sign_ins"]
                 ],
             })
-
         return planning
-
     except Exception as exc:
         handle_service_error(exc)
 
-
-# =========================
-# MIS-10 : LISTE DES INSCRIPTIONS
-# D'UNE MISSION
-# =========================
 
 @router.get(
     "/missions/{mission_id}/sign-ins",
@@ -378,22 +299,14 @@ def get_planning(
 )
 def list_sign_ins(
     mission_id: UUID,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
 ):
     try:
-        return service.list_mission_sign_ins(
-            db,
-            mission_id,
-        )
-
+        return service.list_mission_sign_ins(db, mission_id)
     except Exception as exc:
         handle_service_error(exc)
 
-
-# =========================
-# MIS-11 : VALIDER UNE INSCRIPTION
-# =========================
 
 @router.patch(
     "/missions/{mission_id}/sign-ins/{user_id}/validation",
@@ -405,8 +318,8 @@ def validate_sign_in(
     mission_id: UUID,
     user_id: UUID,
     payload: SignInValidation,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_campaign_editor),
+    db: DbSession,
+    user: CampaignEditor,
 ):
     try:
         return service.validate_sign_in(
@@ -415,15 +328,10 @@ def validate_sign_in(
             user_id,
             payload.is_validated,
         )
-
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-12 : INSCRIPTION À UNE MISSION
-# =========================
 
 @router.post(
     "/missions/{mission_id}/sign-ins",
@@ -437,8 +345,8 @@ def validate_sign_in(
 )
 def register_for_mission(
     mission_id: UUID,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_volunteer),
+    db: DbSession,
+    user: Volunteer,
 ):
     try:
         sign_in = service.register_for_mission(
@@ -446,26 +354,19 @@ def register_for_mission(
             mission_id,
             user.id_user,
         )
-
         message = (
             "Votre inscription est acceptée."
             if sign_in.is_validated
             else "La mission est complète. Votre inscription est refusée."
         )
-
         return {
             "message": message,
             "sign_in": sign_in,
         }
-
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-13 : ANNULER SA PROPRE INSCRIPTION
-# =========================
 
 @router.delete(
     "/missions/{mission_id}/sign-ins/me",
@@ -474,24 +375,15 @@ def register_for_mission(
 )
 def cancel_my_registration(
     mission_id: UUID,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_volunteer),
+    db: DbSession,
+    user: Volunteer,
 ):
     try:
-        return service.cancel_registration(
-            db,
-            mission_id,
-            user.id_user,
-        )
-
+        return service.cancel_registration(db, mission_id, user.id_user)
     except Exception as exc:
         db.rollback()
         handle_service_error(exc)
 
-
-# =========================
-# MIS-14 : CONSULTER SES INSCRIPTIONS
-# =========================
 
 @router.get(
     "/volunteers/me/sign-ins",
@@ -503,27 +395,18 @@ def cancel_my_registration(
     response_model=list[MySignInResponse],
 )
 def get_my_sign_ins(
-    db: Session = Depends(get_db),
-    user: User = Depends(require_volunteer),
+    db: DbSession,
+    user: Volunteer,
 ):
     try:
-        registrations = service.get_my_sign_ins(
-            db,
-            user.id_user,
-        )
-
+        registrations = service.get_my_sign_ins(db, user.id_user)
         return [
             my_sign_in_response(db, registration)
             for registration in registrations
         ]
-
     except Exception as exc:
         handle_service_error(exc)
 
-
-# =========================
-# MIS-15 : ESPACE PERSONNEL DU BÉNÉVOLE
-# =========================
 
 @router.get(
     "/volunteers/me/space",
@@ -535,15 +418,11 @@ def get_my_sign_ins(
     response_model=VolunteerSpaceResponse,
 )
 def get_my_space(
-    db: Session = Depends(get_db),
-    user: User = Depends(require_volunteer),
+    db: DbSession,
+    user: Volunteer,
 ):
     try:
-        result = service.get_my_space(
-            db,
-            user.id_user,
-        )
-
+        result = service.get_my_space(db, user.id_user)
         return {
             "upcoming_missions": [
                 my_sign_in_response(db, registration)
@@ -555,6 +434,5 @@ def get_my_space(
             ],
             "notifications": result["notifications"],
         }
-
     except Exception as exc:
         handle_service_error(exc)
