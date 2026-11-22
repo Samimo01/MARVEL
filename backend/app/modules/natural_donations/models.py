@@ -5,13 +5,18 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Numeric, String, Uuid, func,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Uuid,
+    func,
 )
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import Mapped, mapped_column, relationship  # ðŸ‘ˆ AJOUTEZ relationship
 
 from app.database import Base
-
 
 # ============================================================
 # ENUMS PostgreSQL
@@ -30,7 +35,11 @@ object_state_type = ENUM(
     "New", "Very_Good", "Good", "Fair", "Damaged", "Unusable",
     name="object_state", create_type=False,
 )
-
+collect_status_type = ENUM(
+    "Planned", "Done",
+    name="collect_status",
+    create_type=False,
+)
 
 # ============================================================
 # MODÃˆLES
@@ -66,6 +75,12 @@ class Collect(Base):
     planned_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False
+    )
+    status: Mapped[str] = mapped_column(                 
+        collect_status_type,
+        nullable=False,
+        default="Planned",
+        server_default="Planned",
     )
     id_user: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -119,7 +134,6 @@ class NaturalDon(Base):
     Uuid(as_uuid=True),
     ForeignKey("collects.id_collect")
     )
-    id_stock: Mapped[str | None] = mapped_column(String)
 
     # ðŸ‘‡ NOUVELLE RELATION : un don a plusieurs articles
     items: Mapped[list["NaturalDonItem"]] = relationship(
@@ -166,3 +180,5 @@ class NaturalDonItem(Base):
         "NaturalDon",
         back_populates="items",
     )
+
+    id_stock: Mapped[str | None] = mapped_column(String)

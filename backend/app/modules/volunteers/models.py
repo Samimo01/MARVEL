@@ -13,11 +13,10 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ENUM, ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-
 
 mission_status_type = ENUM(
     "Draft",
@@ -44,6 +43,7 @@ class Mission(Base):
     start_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    description: Mapped[str | None] = mapped_column(String)     
 
     finish_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
@@ -51,7 +51,7 @@ class Mission(Base):
 
     seat_number: Mapped[int | None] = mapped_column(Integer)
 
-    skills: Mapped[list[str]] = mapped_column(
+    required_skills: Mapped[list[str]] = mapped_column(
         ARRAY(String),
         nullable=False,
         server_default=text("'{}'"),

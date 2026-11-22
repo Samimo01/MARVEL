@@ -5,13 +5,18 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    Boolean, Computed, DateTime, ForeignKey, Numeric, String, Uuid, func, types,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Uuid,
+    func,
+    types,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-
 
 campaign_status_type = ENUM(
     "Draft", "In_progress", "closed",
@@ -24,7 +29,11 @@ campaign_category_type = ENUM(
     name="campaign_category", create_type=False,
 )
 
-
+donation_type_enum = ENUM(
+    "Mature", "Mixed", "Finnancial",
+    name="donation_type",
+    create_type=False,
+)
 class ArrayOfEnum(types.TypeDecorator):
     """Utilise ARRAY sur PostgreSQL, et JSON sur SQLite (pour les tests)."""
     impl = types.JSON
@@ -81,7 +90,10 @@ class Event(Base):
     )
 
     title: Mapped[str] = mapped_column(String, nullable=False)
-
+    description: Mapped[str | None] = mapped_column(String)          
+    expected_donation_types: Mapped[str | None] = mapped_column(     
+        donation_type_enum
+    )
     event_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
@@ -95,7 +107,11 @@ class Event(Base):
         nullable=False,
         server_default=func.now()
     )
-
+    updated_at: Mapped[datetime] = mapped_column(                   
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
     id_campaign: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("campaigns.id_campaign", ondelete="CASCADE"),
