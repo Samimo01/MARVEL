@@ -13,6 +13,7 @@ role_name_type = ENUM(
     "Stock_Manager",
     "Treasurer",
     "Administrator",
+    "Beneficiary",
     name="role_type",
     create_type=False,
 )
