@@ -7,6 +7,7 @@ on:
       - main
       - master
       - feature/devops-dockerisation
+      - feat/frontend-auth
 
   pull_request:
     branches:
