@@ -21,7 +21,9 @@ security = HTTPBearer(auto_error=False)
 
 def get_access_token(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(security)
+    ],
 ) -> str:
     if credentials is not None:
         return credentials.credentials
@@ -45,8 +47,8 @@ def get_access_token(
 
 
 def get_current_user(
-    token: str = Depends(get_access_token),
-    session: Session = Depends(get_db),
+    token: Annotated[str, Depends(get_access_token)],
+    session: Annotated[Session, Depends(get_db)],
 ) -> User:
     """Valide le JWT (émis par Supabase) et récupère l'utilisateur en DB."""
     try:
