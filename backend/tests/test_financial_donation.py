@@ -13,7 +13,7 @@ from app.main import app
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign
 from app.modules.financial_donations.models import FinancialDon
-import time
+
 
 @pytest.fixture()
 def donations_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
@@ -104,7 +104,8 @@ def test_create_financial_donation_success(donations_client) -> None:
 
     assert response.status_code == 201
     assert response.json()["amount"] == "500.00"
-    assert response.json()["status"] == "Failure"
+    assert response.json()["status"] == "Pending"
+    assert response.json()["paid_at"] is None  
     assert response.json()["id_user"] == str(user_id)
 
 def test_pay_and_check_status(donations_client) -> None:
@@ -163,8 +164,8 @@ def test_get_donation_detail_and_receipt(donations_client) -> None:
 # NOUVEAUX TESTS (DON-04, DON-07, DON-09)
 # ============================================================
 
-from datetime import datetime, timedelta, timezone
-from app.modules.financial_donations.models import FinancialDon
+from datetime import UTC, datetime, timedelta
+
 
 def test_don04_list_my_donations(donations_client) -> None:
     client, test_session = donations_client
@@ -184,7 +185,7 @@ def test_don04_list_my_donations(donations_client) -> None:
     # 2. Modifier sa date pour qu'elle soit "hier" (pour forcer l'ordre)
     with test_session() as session:
         don1 = session.get(FinancialDon, UUID(don1_id))
-        don1.created_at = datetime.now(timezone.utc) - timedelta(days=1)
+        don1.created_at = datetime.now(UTC) - timedelta(days=1)
         session.commit()
 
     # 3. Créer le deuxième don (qui aura la date d'aujourd'hui)

@@ -1,11 +1,10 @@
 """Endpoints HTTP du module natural_donations."""
 
+from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
-
-from datetime import datetime
 
 from app.core.dependencies import (
     get_current_user,
@@ -17,15 +16,26 @@ from app.database import get_db
 from app.modules.auth.models import User
 from app.modules.natural_donations import service as don_service
 from app.modules.natural_donations.schemas import (
-    NaturalDonCreate, NaturalDonOut, NaturalDonWithItemsOut, NaturalDonItemOut,
-    NaturalDonReject, NaturalDonCollectPlan, NaturalDonItemReception,
-    ObjectTypeCreate, ObjectTypeUpdate, ObjectTypeOut, CollectOut, CollectUpdate
+    CollectOut,
+    CollectUpdate,
+    NaturalDonCollectPlan,
+    NaturalDonCreate,
+    NaturalDonItemOut,
+    NaturalDonItemReception,
+    NaturalDonOut,
+    NaturalDonReject,
+    NaturalDonWithItemsOut,
+    ObjectTypeCreate,
+    ObjectTypeOut,
+    ObjectTypeUpdate,
 )
 from app.modules.natural_donations.service import (
-    NaturalDonNotFoundError, ObjectTypeNotFoundError,
-    InvalidStatusTransitionError, ItemNotFoundError
+    InvalidStatusTransitionError,
+    ItemNotFoundError,
+    NaturalDonNotFoundError,
+    ObjectTypeNotFoundError,
 )
-from fastapi import File, UploadFile
+
 # ============================================================
 # Routers
 # ============================================================
@@ -274,7 +284,7 @@ def nat10_update_item_reception(
     except InvalidStatusTransitionError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
-@router.post("/donations/natural/{id_don_n}/stock-in", response_model=NaturalDonOut)
+@router.post("/donations/natural/{id_don_n}/stock-in", response_model=NaturalDonWithItemsOut)
 def nat11_stock_in_natural_don(
     id_don_n: UUID,
     session: Session = Depends(get_db),
@@ -328,7 +338,7 @@ def nat13_update_collect(
 # ============================================================
 # NAT-14 : Confirmation d'une collecte
 # ============================================================
-@router.post("/collects/{id_collect}/confirm", response_model=NaturalDonOut)
+@router.post("/collects/{id_collect}/confirm", response_model=NaturalDonWithItemsOut)
 def nat14_confirm_collect(
     id_collect: UUID,
     session: Session = Depends(get_db),

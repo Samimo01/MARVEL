@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import cast, func, select, Numeric
+from sqlalchemy import Numeric, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.modules.financial_donations.models import FinancialDon

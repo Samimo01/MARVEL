@@ -1,11 +1,13 @@
 """Logique mÃ©tier du module natural_donations."""
 
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.image_utils import convert_image_to_webp
+from app.core.supabase_client import NATURAL_DONATIONS_BUCKET, supabase_admin
+from app.modules.auth import repository as auth_repo
 from app.modules.auth.models import User
 from app.modules.natural_donations import repository as don_repo
 from app.modules.natural_donations.models import (
@@ -15,13 +17,20 @@ from app.modules.natural_donations.models import (
     ObjectType,
 )
 from app.modules.natural_donations.schemas import (
-    NaturalDonCreate, NaturalDonOut, NaturalDonWithItemsOut, NaturalDonItemOut,
-    NaturalDonReject, NaturalDonCollectPlan, NaturalDonItemReception,CollectUpdate,
-    ObjectTypeCreate, ObjectTypeUpdate, ObjectTypeOut
+    CollectUpdate,
+    NaturalDonCollectPlan,
+    NaturalDonCreate,
+    NaturalDonItemOut,
+    NaturalDonItemReception,
+    NaturalDonOut,
+    NaturalDonReject,
+    NaturalDonWithItemsOut,
+    ObjectTypeCreate,
+    ObjectTypeOut,
+    ObjectTypeUpdate,
 )
-from app.core.supabase_client import NATURAL_DONATIONS_BUCKET, supabase_admin
-from app.core.image_utils import convert_image_to_webp
-from app.modules.auth import repository as auth_repo
+
+
 # ============================================================
 # Exceptions
 # ============================================================
@@ -241,7 +250,7 @@ def validate_natural_don(session: Session, id_don_n: UUID, user: User) -> Natura
 
     don.status = "valid"
     don.validated_by = user.id_user
-    don.validated_at = datetime.now(timezone.utc)
+    don.validated_at = datetime.now(UTC)
     session.commit()
     session.refresh(don)
     return NaturalDonOut.model_validate(don)
@@ -258,7 +267,7 @@ def reject_natural_don(session: Session, id_don_n: UUID, user: User, payload: Na
     don.status = "Refuse"
     don.refusal_reason = payload.refusal_reason
     don.validated_by = user.id_user
-    don.validated_at = datetime.now(timezone.utc)
+    don.validated_at = datetime.now(UTC)
     session.commit()
     session.refresh(don)
     return NaturalDonOut.model_validate(don)
@@ -359,13 +368,13 @@ def confirm_collect(
 
     don.status = "In_Stock"
     don.received_by = user.id_user
-    don.received_at = datetime.now(timezone.utc)
-    don.id_stock = f"STOCK-{don.id_don_n.hex[:6].upper()}"
+    don.received_at = datetime.now(UTC)
+    collect.status = "Done"
 
     session.commit()
     session.refresh(don)
 
-    return NaturalDonOut.model_validate(don)
+    return NaturalDonWithItemsOut.model_validate(don)
 # ============================================================
 # NAT-10 : ContrÃ´le Ã  la rÃ©ception
 # ============================================================
@@ -400,9 +409,11 @@ def stock_in_natural_don(session: Session, id_don_n: UUID, user: User) -> Natura
     # Pour l'instant, on simule l'affectation Ã  un ID de stock.
     don.status = "In_Stock"
     don.received_by = user.id_user
-    don.received_at = datetime.now(timezone.utc)
-    don.id_stock = f"STOCK-{don.id_don_n.hex[:6].upper()}"
+    don.received_at = datetime.now(UTC)
+    for item in don.items:
+        if item.is_compliant:
+            item.id_stock = f"STOCK-{item.id_nat.hex[:6].upper()}"
 
     session.commit()
     session.refresh(don)
-    return NaturalDonOut.model_validate(don)
+    return NaturalDonWithItemsOut.model_validate(don)

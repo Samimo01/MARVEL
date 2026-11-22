@@ -15,19 +15,18 @@ from app.modules.campaigns.schemas import (
     CampaignOut,
     CampaignProgressOut,
     CampaignUpdate,
-    FinancialDonOut,
     EventCreate,
     EventOut,
     EventUpdate,
+    FinancialDonOut,
     GaugeOut,
 )
 from app.modules.campaigns.service import (
     CampaignNotFoundError,
     CampaignTitleAlreadyExistsError,
-    InvalidStatusTransitionError,
     EventNotFoundError,
+    InvalidStatusTransitionError,
 )
-
 
 # ============================================================
 # DÃ©claration des routers
@@ -247,6 +246,7 @@ def cam06_get_donations(
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 from fastapi import File, UploadFile
+
 
 # ============================================================
 # CAM-12 : POST /campaigns/{id}/image

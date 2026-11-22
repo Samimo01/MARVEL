@@ -1,4 +1,6 @@
 from collections.abc import Iterator
+from decimal import Decimal
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -13,8 +15,7 @@ from app.main import app
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign, Event
 from app.modules.financial_donations.models import FinancialDon
-from decimal import Decimal
-from unittest.mock import patch
+
 
 @pytest.fixture()
 def campaigns_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
@@ -276,8 +277,8 @@ def test_upload_image_invalid_mime(campaigns_client) -> None:
     assert response.status_code == 400
     assert "n'est pas une image" in response.json()["detail"]
 
-from app.modules.campaigns.models import Campaign
 from unittest.mock import patch
+
 
 def test_image_url_is_persisted_in_db(campaigns_client) -> None:
     """

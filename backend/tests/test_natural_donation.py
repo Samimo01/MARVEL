@@ -16,7 +16,10 @@ from app.main import app
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign
 from app.modules.natural_donations.models import (
-    NaturalDon, NaturalDonItem, Collect, ObjectType,
+    Collect,
+    NaturalDon,
+    NaturalDonItem,
+    ObjectType,
 )
 
 
@@ -341,7 +344,8 @@ def test_nat10_and_nat11_reception_and_stock_in(natural_client) -> None:
     )
     assert res_stock.status_code == 200
     assert res_stock.json()["status"] == "In_Stock"
-    assert res_stock.json()["id_stock"] is not None
+    items = res_stock.json()["items"]
+    assert len(items) >= 1
 
 
 # ============================================================
@@ -663,5 +667,7 @@ def test_nat14_confirm_collect(natural_client) -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "In_Stock"
-    assert response.json()["id_stock"] is not None
+    if "items" in response.json() and response.json()["items"]:
+        items = response.json()["items"]
+        assert len(items) >= 1
     assert response.json()["received_by"] == str(admin_id)

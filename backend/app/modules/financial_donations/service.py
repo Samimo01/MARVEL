@@ -1,7 +1,7 @@
 """Logique métier du module financial_donations."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -12,7 +12,11 @@ from app.modules.campaigns import repository as campaign_repo
 from app.modules.financial_donations import repository as don_repo
 from app.modules.financial_donations.models import FinancialDon
 from app.modules.financial_donations.schemas import (
-    FinancialDonCreate, FinancialDonOut, PaymentInitOut, PaymentStatusOut, ReceiptOut
+    FinancialDonCreate,
+    FinancialDonOut,
+    PaymentInitOut,
+    PaymentStatusOut,
+    ReceiptOut,
 )
 
 
@@ -50,7 +54,7 @@ def create_financial_donation(
         id_campaign=payload.id_campaign,
         amount=payload.amount,
         is_anonymous=payload.is_anonymous,
-        status="Failure"
+        status="Pending",
     )
     don_repo.add_donation(session, donation)
     session.commit()
@@ -89,14 +93,20 @@ def get_payment_status(session: Session, id_don_f: UUID) -> PaymentStatusOut:
     
     if donation.reference_payment and donation.status != "Success":
         donation.status = "Success"
-        don_repo.update_donation(session, donation, {"status": "Success"})
+        donation.paid_at = datetime.now(UTC)
+        don_repo.update_donation(session, donation, {
+            "status": "Success",
+            "paid_at": donation.paid_at
+            })
+        
         session.commit()
         session.refresh(donation)
 
     return PaymentStatusOut(
         id_don_f=donation.id_don_f,
         status=donation.status,
-        reference_payment=donation.reference_payment
+        reference_payment=donation.reference_payment,
+        paid_at=donation.paid_at
     )
 
 

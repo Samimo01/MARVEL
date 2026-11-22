@@ -100,6 +100,8 @@ class EventCreate(BaseModel):
     """CAM-10 â€” CrÃ©ation d'un Ã©vÃ©nement."""
 
     title: str = Field(..., min_length=1, max_length=200)
+    description: str | None = None                 
+    expected_donation_types: str | None = None
     event_at: datetime | None = None
     place: str | None = None
     goal: Decimal | None = Field(None, ge=0)
@@ -109,6 +111,8 @@ class EventUpdate(BaseModel):
     """CAM-13 â€” Modification d'un Ã©vÃ©nement."""
 
     title: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = None                 
+    expected_donation_types: str | None = None
     event_at: datetime | None = None
     place: str | None = None
     goal: Decimal | None = Field(None, ge=0)
@@ -120,9 +124,11 @@ class EventOut(BaseModel):
     id_event: UUID
     id_campaign: UUID
     title: str
+    description: str | None                  
+    expected_donation_types: str | None 
     event_at: datetime | None
     place: str | None
     goal: Decimal | None
     created_at: datetime
-
+    updated_at: datetime
     model_config = ConfigDict(from_attributes=True)

@@ -17,7 +17,7 @@ from app.modules.campaigns.schemas import (
     EventCreate,
     EventOut,
     EventUpdate,
-    GaugeOut
+    GaugeOut,
 )
 from app.modules.financial_donations import service as don_service
 from app.modules.financial_donations.schemas import FinancialDonOut
@@ -208,8 +208,8 @@ def list_all_campaigns(
     return [CampaignOut.model_validate(c) for c in campaigns]
 
 
-from app.core.supabase_client import CAMPAIGNS_BUCKET, supabase_admin
 from app.core.image_utils import convert_image_to_webp
+from app.core.supabase_client import CAMPAIGNS_BUCKET, supabase_admin
 
 
 def _upload_campaign_image(

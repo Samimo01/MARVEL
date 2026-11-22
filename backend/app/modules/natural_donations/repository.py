@@ -1,10 +1,9 @@
 """AccÃ¨s aux donnÃ©es du module natural_donations."""
 
 from datetime import datetime
-from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.modules.natural_donations.models import (

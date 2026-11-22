@@ -6,16 +6,25 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_campaign_editor # Adapter selon vos rôles
+from app.core.dependencies import (  # Adapter selon vos rôles
+    get_current_user,
+    require_campaign_editor,
+)
 from app.database import get_db
 from app.modules.auth.models import User
 from app.modules.financial_donations import service as don_service
 from app.modules.financial_donations.schemas import (
-    FinancialDonCreate, FinancialDonOut, PaymentInitOut, PaymentStatusOut, ReceiptOut
+    FinancialDonCreate,
+    FinancialDonOut,
+    PaymentInitOut,
+    PaymentStatusOut,
+    ReceiptOut,
 )
 from app.modules.financial_donations.service import (
-    DonationNotFoundError, CampaignNotFoundError, 
-    DonationAlreadyPaidError, DonationNotSuccessfulError
+    CampaignNotFoundError,
+    DonationAlreadyPaidError,
+    DonationNotFoundError,
+    DonationNotSuccessfulError,
 )
 
 router = APIRouter(prefix="/dons", tags=["Financial Donations"])
