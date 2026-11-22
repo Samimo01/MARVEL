@@ -38,6 +38,7 @@ class NaturalDonItemCreate(BaseModel):
     declared_quantity: Decimal = Field(..., gt=0)
     declared_state: str
     description: str | None = None
+    id_stock: str | None = None
 
 class NaturalDonItemReception(BaseModel):
     received_quantity: Decimal = Field(..., ge=0)
@@ -57,7 +58,7 @@ class NaturalDonItemOut(BaseModel):
     received_state: str | None
     is_compliant: bool | None
     non_compliant_reason: str | None
-    
+    id_stock: str | None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -93,7 +94,6 @@ class NaturalDonOut(BaseModel):
     id_user: UUID
     id_campaign: UUID | None
     id_collect: UUID | None
-    id_stock: str | None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -104,6 +104,7 @@ class CollectOut(BaseModel):
     id_collect: UUID
     place: str
     planned_at: datetime
+    status: str
     id_user: UUID
 
     model_config = ConfigDict(from_attributes=True)
