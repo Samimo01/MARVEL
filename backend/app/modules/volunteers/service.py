@@ -1,4 +1,3 @@
-
 """Logique métier du module volunteers."""
 
 from datetime import UTC, datetime
@@ -12,6 +11,7 @@ from app.modules.volunteers.models import Mission, SignIn
 # =========================
 # EXCEPTIONS MÉTIER
 # =========================
+
 
 class MissionNotFoundError(Exception):
     pass
@@ -74,19 +74,14 @@ def get_mission_or_raise(
 
 
 def validate_dates(start_at, finish_at):
-    if (
-        start_at is not None
-        and finish_at is not None
-        and finish_at <= start_at
-    ):
-        raise InvalidMissionDataError(
-            "La date de fin doit être après la date de début."
-        )
+    if start_at is not None and finish_at is not None and finish_at <= start_at:
+        raise InvalidMissionDataError("La date de fin doit être après la date de début.")
 
 
 # =========================
 # CRÉATION ET CONSULTATION
 # =========================
+
 
 def create_mission(
     db: Session,
@@ -119,9 +114,7 @@ def list_missions(
         status = STATUS_TO_DB.get(status, status)
 
     if date_from and date_to and date_from > date_to:
-        raise InvalidMissionDataError(
-            "La date de début doit précéder la date de fin."
-        )
+        raise InvalidMissionDataError("La date de début doit précéder la date de fin.")
 
     return repo.list_missions(
         db,
@@ -165,6 +158,7 @@ def get_mission_detail(
 # MODIFICATION ET SUPPRESSION
 # =========================
 
+
 def update_mission(
     db: Session,
     mission_id: UUID,
@@ -194,9 +188,7 @@ def delete_mission(
     mission = get_mission_or_raise(db, mission_id)
 
     if mission.status != "Draft":
-        raise InvalidMissionStatusError(
-            "Seules les missions en brouillon peuvent être supprimées."
-        )
+        raise InvalidMissionStatusError("Seules les missions en brouillon peuvent être supprimées.")
 
     repo.delete_mission(db, mission)
     db.commit()
@@ -206,6 +198,7 @@ def delete_mission(
 # CHANGEMENTS DE STATUT
 # =========================
 
+
 def publish_mission(
     db: Session,
     mission_id: UUID,
@@ -214,9 +207,7 @@ def publish_mission(
     mission = get_mission_or_raise(db, mission_id)
 
     if mission.status != "Draft":
-        raise InvalidMissionStatusError(
-            "Seule une mission en brouillon peut être publiée."
-        )
+        raise InvalidMissionStatusError("Seule une mission en brouillon peut être publiée.")
 
     mission.status = "Publish"
 
@@ -236,9 +227,7 @@ def complete_mission(
     mission = get_mission_or_raise(db, mission_id)
 
     if mission.status != "Publish":
-        raise InvalidMissionStatusError(
-            "Seule une mission publiée peut être terminée."
-        )
+        raise InvalidMissionStatusError("Seule une mission publiée peut être terminée.")
 
     mission.status = "Complete"
 
@@ -256,9 +245,7 @@ def cancel_mission(
     mission = get_mission_or_raise(db, mission_id)
 
     if mission.status in ("Complete", "Finished", "Canceled"):
-        raise InvalidMissionStatusError(
-            "Cette mission ne peut plus être annulée."
-        )
+        raise InvalidMissionStatusError("Cette mission ne peut plus être annulée.")
 
     mission.status = "Canceled"
 
@@ -274,6 +261,7 @@ def cancel_mission(
 # INSCRIPTIONS DES BÉNÉVOLES
 # =========================
 
+
 def register_for_mission(
     db: Session,
     mission_id: UUID,
@@ -286,9 +274,7 @@ def register_for_mission(
         raise MissionNotFoundError("Mission introuvable.")
 
     if mission.status != "Publish":
-        raise InvalidMissionStatusError(
-            "Cette mission n'est pas ouverte aux inscriptions."
-        )
+        raise InvalidMissionStatusError("Cette mission n'est pas ouverte aux inscriptions.")
 
     existing = repo.get_sign_in(
         db,
@@ -299,9 +285,7 @@ def register_for_mission(
     # Une inscription existante interdit toute nouvelle tentative,
     # même si elle a été refusée ou annulée.
     if existing is not None:
-        raise DuplicateSignInError(
-            "Vous avez déjà effectué une inscription pour cette mission."
-        )
+        raise DuplicateSignInError("Vous avez déjà effectué une inscription pour cette mission.")
 
     active_count = repo.count_active_sign_ins(
         db,
@@ -309,10 +293,7 @@ def register_for_mission(
     )
 
     # Si aucune capacité maximale n'est définie, la place est disponible.
-    has_available_seat = (
-        mission.seat_number is None
-        or active_count < mission.seat_number
-    )
+    has_available_seat = mission.seat_number is None or active_count < mission.seat_number
 
     now = datetime.now(UTC)
 
@@ -345,9 +326,7 @@ def cancel_registration(
     )
 
     if sign_in is None or sign_in.is_canceled:
-        raise SignInNotFoundError(
-            "Inscription introuvable ou déjà annulée."
-        )
+        raise SignInNotFoundError("Inscription introuvable ou déjà annulée.")
 
     sign_in.is_canceled = True
     sign_in.is_validated = False
@@ -363,6 +342,7 @@ def cancel_registration(
 # =========================
 # GESTION DES INSCRIPTIONS
 # =========================
+
 
 def list_mission_sign_ins(
     db: Session,
@@ -393,9 +373,7 @@ def validate_sign_in(
     )
 
     if sign_in is None or sign_in.is_canceled:
-        raise SignInNotFoundError(
-            "Inscription introuvable ou annulée."
-        )
+        raise SignInNotFoundError("Inscription introuvable ou annulée.")
 
     # Une validation manuelle ne peut pas dépasser la capacité.
     if is_validated and not sign_in.is_validated:
@@ -404,18 +382,11 @@ def validate_sign_in(
             mission_id,
         )
 
-        if (
-            mission.seat_number is not None
-            and active_count >= mission.seat_number
-        ):
-            raise MissionCapacityError(
-                "Impossible de valider : la mission est complète."
-            )
+        if mission.seat_number is not None and active_count >= mission.seat_number:
+            raise MissionCapacityError("Impossible de valider : la mission est complète.")
 
     sign_in.is_validated = is_validated
-    sign_in.validated_at = (
-        datetime.now(UTC) if is_validated else None
-    )
+    sign_in.validated_at = datetime.now(UTC) if is_validated else None
 
     repo.update_sign_in(db, sign_in, {})
 
@@ -429,6 +400,7 @@ def validate_sign_in(
 # PLANNING
 # =========================
 
+
 def get_planning(
     db: Session,
     date_from: datetime,
@@ -436,9 +408,7 @@ def get_planning(
 ) -> list[dict]:
 
     if date_from > date_to:
-        raise InvalidMissionDataError(
-            "La date de début doit précéder la date de fin."
-        )
+        raise InvalidMissionDataError("La date de début doit précéder la date de fin.")
 
     missions = repo.list_missions(
         db,
@@ -454,23 +424,25 @@ def get_planning(
             mission.id_mission,
         )
 
-        planning.append({
-            "mission": mission,
-            "place": repo.get_mission_place(db, mission),
-            "sign_ins": sign_ins,
-            "remaining_seats": (
-                max(
-                    mission.seat_number
-                    - repo.count_active_sign_ins(
-                        db,
-                        mission.id_mission,
-                    ),
-                    0,
-                )
-                if mission.seat_number is not None
-                else None
-            ),
-        })
+        planning.append(
+            {
+                "mission": mission,
+                "place": repo.get_mission_place(db, mission),
+                "sign_ins": sign_ins,
+                "remaining_seats": (
+                    max(
+                        mission.seat_number
+                        - repo.count_active_sign_ins(
+                            db,
+                            mission.id_mission,
+                        ),
+                        0,
+                    )
+                    if mission.seat_number is not None
+                    else None
+                ),
+            }
+        )
 
     return planning
 
@@ -479,6 +451,7 @@ def get_planning(
 # ESPACE PERSONNEL DU BÉNÉVOLE
 # MIS-14 ET MIS-15
 # =========================
+
 
 def get_my_sign_ins(
     db: Session,
@@ -491,11 +464,13 @@ def get_my_sign_ins(
     result = []
 
     for sign_in, mission in rows:
-        result.append({
-            "sign_in": sign_in,
-            "mission": mission,
-            "place": repo.get_mission_place(db, mission),
-        })
+        result.append(
+            {
+                "sign_in": sign_in,
+                "mission": mission,
+                "place": repo.get_mission_place(db, mission),
+            }
+        )
 
     return result
 
@@ -519,9 +494,7 @@ def get_my_space(
 
         if mission_start is not None:
             if mission_start.tzinfo is None:
-                mission_start = mission_start.replace(
-                    tzinfo=UTC
-                )
+                mission_start = mission_start.replace(tzinfo=UTC)
             else:
                 mission_start = mission_start.astimezone(UTC)
 
@@ -538,10 +511,7 @@ def get_my_space(
 
         elif (
             sign_in.is_canceled
-            or (
-                mission.start_at is not None
-                and mission_start < now
-            )
+            or (mission.start_at is not None and mission_start < now)
             or mission.status in ("Complete", "Finished", "Canceled")
         ):
             history.append(registration)

@@ -14,15 +14,11 @@ from app.modules.natural_donations.models import (
 )
 
 
-def get_object_type_by_id(
-    session: Session, id_object: UUID
-) -> ObjectType | None:
+def get_object_type_by_id(session: Session, id_object: UUID) -> ObjectType | None:
     return session.get(ObjectType, id_object)
 
 
-def list_object_types(
-    session: Session, only_active: bool = False
-) -> list[ObjectType]:
+def list_object_types(session: Session, only_active: bool = False) -> list[ObjectType]:
     stmt = select(ObjectType).order_by(ObjectType.name)
     if only_active:
         stmt = stmt.where(ObjectType.is_active.is_(True))
@@ -34,9 +30,7 @@ def add_object_type(session: Session, obj_type: ObjectType) -> None:
     session.flush()
 
 
-def update_object_type(
-    session: Session, obj_type: ObjectType, data: dict
-) -> ObjectType:
+def update_object_type(session: Session, obj_type: ObjectType, data: dict) -> ObjectType:
     for field, value in data.items():
         setattr(obj_type, field, value)
     session.flush()
@@ -52,16 +46,12 @@ def get_natural_don_by_id(
     return session.scalar(stmt)
 
 
-def get_natural_don_by_collect_id(
-    session: Session, id_collect: UUID
-) -> NaturalDon | None:
+def get_natural_don_by_collect_id(session: Session, id_collect: UUID) -> NaturalDon | None:
     stmt = select(NaturalDon).where(NaturalDon.id_collect == id_collect)
     return session.scalar(stmt)
 
 
-def list_natural_dons(
-    session: Session, status: str | None = None
-) -> list[NaturalDon]:
+def list_natural_dons(session: Session, status: str | None = None) -> list[NaturalDon]:
     stmt = select(NaturalDon).order_by(NaturalDon.created_at.desc())
     if status:
         stmt = stmt.where(NaturalDon.status == status)
@@ -78,9 +68,7 @@ def delete_natural_don(session: Session, don: NaturalDon) -> None:
     session.flush()
 
 
-def get_natural_don_item(
-    session: Session, id_don_n: UUID, id_nat: UUID
-) -> NaturalDonItem | None:
+def get_natural_don_item(session: Session, id_don_n: UUID, id_nat: UUID) -> NaturalDonItem | None:
     return session.scalar(
         select(NaturalDonItem).where(
             NaturalDonItem.id_don_n == id_don_n,
@@ -94,15 +82,11 @@ def add_collect(session: Session, collect: Collect) -> None:
     session.flush()
 
 
-def get_collect_by_id(
-    session: Session, id_collect: UUID
-) -> Collect | None:
+def get_collect_by_id(session: Session, id_collect: UUID) -> Collect | None:
     return session.get(Collect, id_collect)
 
 
-def update_collect(
-    session: Session, collect: Collect, data: dict
-) -> Collect:
+def update_collect(session: Session, collect: Collect, data: dict) -> Collect:
     for field, value in data.items():
         setattr(collect, field, value)
     session.flush()

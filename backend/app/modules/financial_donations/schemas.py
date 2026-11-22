@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ============================================================
 class FinancialDonCreate(BaseModel):
     """DON-01 : Création d'un don financier."""
+
     amount: Decimal = Field(..., gt=0)
     id_campaign: UUID
     is_anonymous: bool = False
@@ -22,6 +23,7 @@ class FinancialDonCreate(BaseModel):
 # ============================================================
 class FinancialDonOut(BaseModel):
     """Représentation complète d'un don financier."""
+
     id_don_f: UUID
     is_anonymous: bool
     amount: Decimal
@@ -39,6 +41,7 @@ class FinancialDonOut(BaseModel):
 
 class PaymentInitOut(BaseModel):
     """DON-02 : Réponse de l'initialisation du paiement."""
+
     id_don_f: UUID
     payment_url: str
     message: str
@@ -46,6 +49,7 @@ class PaymentInitOut(BaseModel):
 
 class PaymentStatusOut(BaseModel):
     """DON-03 : Statut du paiement."""
+
     id_don_f: UUID
     status: str
     reference_payment: str | None
@@ -54,6 +58,7 @@ class PaymentStatusOut(BaseModel):
 
 class ReceiptOut(BaseModel):
     """DON-06 : Réponse de génération de reçu."""
+
     id_don_f: UUID
     receipt_url: str
     message: str

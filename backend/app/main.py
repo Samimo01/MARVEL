@@ -35,4 +35,4 @@ def check_db_connection() -> None:
         print("✅ Connexion Supabase OK")
     except Exception as exc:
         print(f"⚠️ Connexion Supabase ÉCHEC : {exc}")
-        # raise 
+        # raise

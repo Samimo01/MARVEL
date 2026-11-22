@@ -75,9 +75,7 @@ def don01_create_financial_donation(
 ):
     """DON-01 : Créer un don financier."""
     try:
-        return don_service.create_financial_donation(
-            session, user=user, payload=payload
-        )
+        return don_service.create_financial_donation(session, user=user, payload=payload)
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 

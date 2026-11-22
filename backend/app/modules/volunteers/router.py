@@ -42,10 +42,7 @@ def has_active_role(session: Session, user: User, role: str) -> bool:
         user.id_user,
         role,
     )
-    return (
-        assignment is not None
-        and assignment.assignment_type == "assigned"
-    )
+    return assignment is not None and assignment.assignment_type == "assigned"
 
 
 def require_mission_reader(
@@ -131,9 +128,8 @@ def list_missions(
     date_to: Annotated[datetime | None, Query()] = None,
 ):
     try:
-        is_staff = (
-            has_active_role(db, user, "Collection_Manager")
-            or has_active_role(db, user, "Administrator")
+        is_staff = has_active_role(db, user, "Collection_Manager") or has_active_role(
+            db, user, "Administrator"
         )
         missions = service.list_missions(
             db,
@@ -279,14 +275,16 @@ def get_planning(
         planning = []
         for item in results:
             mission_data = mission_response(db, item["mission"])
-            planning.append({
-                **mission_data,
-                "remaining_seats": item["remaining_seats"],
-                "sign_ins": [
-                    SignInResponse.model_validate(sign_in).model_dump()
-                    for sign_in in item["sign_ins"]
-                ],
-            })
+            planning.append(
+                {
+                    **mission_data,
+                    "remaining_seats": item["remaining_seats"],
+                    "sign_ins": [
+                        SignInResponse.model_validate(sign_in).model_dump()
+                        for sign_in in item["sign_ins"]
+                    ],
+                }
+            )
         return planning
     except Exception as exc:
         handle_service_error(exc)
@@ -400,10 +398,7 @@ def get_my_sign_ins(
 ):
     try:
         registrations = service.get_my_sign_ins(db, user.id_user)
-        return [
-            my_sign_in_response(db, registration)
-            for registration in registrations
-        ]
+        return [my_sign_in_response(db, registration) for registration in registrations]
     except Exception as exc:
         handle_service_error(exc)
 
@@ -411,10 +406,7 @@ def get_my_sign_ins(
 @router.get(
     "/volunteers/me/space",
     summary="Mis15  Consulter mon espace bénévole",
-    description=(
-        "Afficher les missions à venir, l'historique "
-        "et les notifications disponibles."
-    ),
+    description=("Afficher les missions à venir, l'historique et les notifications disponibles."),
     response_model=VolunteerSpaceResponse,
 )
 def get_my_space(
@@ -429,8 +421,7 @@ def get_my_space(
                 for registration in result["upcoming_missions"]
             ],
             "history": [
-                my_sign_in_response(db, registration)
-                for registration in result["history"]
+                my_sign_in_response(db, registration) for registration in result["history"]
             ],
             "notifications": result["notifications"],
         }

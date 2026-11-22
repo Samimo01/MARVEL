@@ -20,16 +20,18 @@ from app.database import Base
 
 # Enumération définie dans votre script SQL
 financial_donation_status_type = ENUM(
-    "Failure", "Pending", "Success",
-    name="financial_donation_status", create_type=False,
+    "Failure",
+    "Pending",
+    "Success",
+    name="financial_donation_status",
+    create_type=False,
 )
+
 
 class FinancialDon(Base):
     __tablename__ = "financial_dons"
 
-    id_don_f: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid4
-    )
+    id_don_f: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     is_anonymous: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
@@ -55,4 +57,4 @@ class FinancialDon(Base):
     id_campaign: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("campaigns.id_campaign", ondelete="CASCADE"), nullable=False
     )
-    id_ben_file: Mapped[str | None] = mapped_column(String) # TEXT dans le script SQL
+    id_ben_file: Mapped[str | None] = mapped_column(String)  # TEXT dans le script SQL

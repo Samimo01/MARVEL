@@ -1,5 +1,6 @@
 """Dépendances partagées : session DB,
- authentification et autorisations."""
+authentification et autorisations."""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from app.modules.auth import repository as auth_repo
 from app.modules.auth.models import User
 
 security = HTTPBearer()
+
 
 def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
@@ -32,9 +34,7 @@ def get_current_user(
         user_id = UUID(user_id)
 
     except (jwt.PyJWTError, ValueError) as exc:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, "Token invalide ou expiré"
-        ) from exc
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token invalide ou expiré") from exc
 
     user = session.get(User, user_id)
     if not user:
@@ -48,9 +48,7 @@ def require_campaign_editor(
 ) -> User:
     """Autorise la gestion des campagnes aux gestionnaires de collecte et administrateurs."""
     for role_name in ("Collection_Manager", "Administrator"):
-        assignment = auth_repo.get_latest_role_assignment(
-            session, user.id_user, role_name
-        )
+        assignment = auth_repo.get_latest_role_assignment(session, user.id_user, role_name)
         if assignment is not None and assignment.assignment_type == "assigned":
             return user
 
@@ -65,9 +63,7 @@ def require_administrator(
     session: Annotated[Session, Depends(get_db)],
 ) -> User:
     """Réserve l'administration des rôles aux administrateurs actifs."""
-    assignment = auth_repo.get_latest_role_assignment(
-        session, user.id_user, "Administrator"
-    )
+    assignment = auth_repo.get_latest_role_assignment(session, user.id_user, "Administrator")
     if assignment is None or assignment.assignment_type != "assigned":
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
@@ -82,9 +78,7 @@ def require_natural_donation_staff(
 ) -> User:
     """Autorise les rôles liés aux dons naturels."""
     for role_name in ("Stock_Manager", "Collection_Manager", "Administrator"):
-        assignment = auth_repo.get_latest_role_assignment(
-            session, user.id_user, role_name
-        )
+        assignment = auth_repo.get_latest_role_assignment(session, user.id_user, role_name)
         if assignment is not None and assignment.assignment_type == "assigned":
             return user
 
@@ -100,9 +94,7 @@ def require_stock_manager_or_admin(
 ) -> User:
     """Autorise uniquement Stock_Manager et Administrator."""
     for role_name in ("Stock_Manager", "Administrator"):
-        assignment = auth_repo.get_latest_role_assignment(
-            session, user.id_user, role_name
-        )
+        assignment = auth_repo.get_latest_role_assignment(session, user.id_user, role_name)
         if assignment is not None and assignment.assignment_type == "assigned":
             return user
 
@@ -117,9 +109,7 @@ def require_volunteer(
     session: Annotated[Session, Depends(get_db)],
 ) -> User:
     """Autorise uniquement les bénévoles ayant un rôle actif."""
-    assignment = auth_repo.get_latest_role_assignment(
-        session, user.id_user, "Volunteer"
-    )
+    assignment = auth_repo.get_latest_role_assignment(session, user.id_user, "Volunteer")
 
     if assignment is None or assignment.assignment_type != "assigned":
         raise HTTPException(
@@ -128,3 +118,21 @@ def require_volunteer(
         )
 
     return user
+
+def require_treasury_staff(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
+) -> User:
+    """Autorise les trésoriers et les administrateurs."""
+    for role_name in ("Treasurer", "Administrator"):
+        assignment = auth_repo.get_latest_role_assignment(
+            session, user.id_user, role_name
+        )
+
+        if assignment is not None and assignment.assignment_type == "assigned":
+            return user
+
+    raise HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        "Rôle requis : Treasurer ou Administrator.",
+    )

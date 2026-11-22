@@ -82,6 +82,7 @@ class RoleAssignmentResponse(BaseModel):
     assignment_type: RoleAssignmentStatus
     created_at: datetime
 
+
 class UserOut(BaseModel):
     id_user: UUID
     firstname: str

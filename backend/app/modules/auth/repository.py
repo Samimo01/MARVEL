@@ -9,6 +9,7 @@ from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 def get_user_by_email(session: Session, email: str) -> User | None:
     return session.scalar(select(User).where(func.lower(User.email) == email.lower()))
 
+
 def get_user_by_id(session: Session, id_user: UUID) -> User | None:
     return session.get(User, id_user)
 
@@ -58,15 +59,10 @@ def list_role_assignments_for_user(
             RoleAssignment.id_role_assignment.desc(),
         )
     )
-    return [
-        (assignment, role_name)
-        for assignment, role_name in session.execute(statement)
-    ]
+    return [(assignment, role_name) for assignment, role_name in session.execute(statement)]
 
 
-def list_role_assignments_for_role(
-    session: Session, role_id: UUID
-) -> list[RoleAssignment]:
+def list_role_assignments_for_role(session: Session, role_id: UUID) -> list[RoleAssignment]:
     statement = (
         select(RoleAssignment)
         .where(RoleAssignment.id_role == role_id)

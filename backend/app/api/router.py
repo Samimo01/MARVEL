@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter
 
 from app.api import health, public
@@ -6,7 +5,6 @@ from app.modules.auth.router import admin_router as auth_admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.router import users_router
 from app.modules.beneficiaries.router import router as beneficiaries_router
-from app.modules.budget.router import router as budget_router
 from app.modules.campaigns.router import (
     campaign_catalog_router,
     event_catalog_router,
@@ -17,11 +15,18 @@ from app.modules.campaigns.router import (
 )
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.distributions.router import router as distributions_router
-from app.modules.financial_donations.router import router as financial_donations_router
-from app.modules.natural_donations.router import admin_router as natural_admin_router
-from app.modules.natural_donations.router import router as natural_donations_router
+from app.modules.financial_donations.router import (
+    router as financial_donations_router,
+)
+from app.modules.natural_donations.router import (
+    admin_router as natural_admin_router,
+)
+from app.modules.natural_donations.router import (
+    router as natural_donations_router,
+)
 from app.modules.receipts.router import router as receipts_router
 from app.modules.stock.router import router as stock_router
+from app.modules.treasury.router import router as treasury_router
 from app.modules.volunteers.router import router as volunteers_router
 
 api_router = APIRouter()
@@ -42,7 +47,7 @@ for module_router in (
     stock_router,
     beneficiaries_router,
     distributions_router,
-    budget_router,
+    treasury_router,
     volunteers_router,
     dashboard_router,
     users_router,

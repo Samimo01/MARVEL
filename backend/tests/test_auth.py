@@ -375,8 +375,7 @@ def test_non_administrator_cannot_assign_roles(auth_client) -> None:
     _, token = _register_test_user(client, "user@example.com")
 
     response = client.post(
-        "/api/v1/admin/users/00000000-0000-0000-0000-000000000001"
-        "/roles/Collection_Manager",
+        "/api/v1/admin/users/00000000-0000-0000-0000-000000000001/roles/Collection_Manager",
         headers={"Authorization": f"Bearer {token}"},
         json={"assignment_type": "assigned"},
     )
@@ -397,14 +396,18 @@ def test_administrator_cannot_revoke_the_last_administrator(auth_client) -> None
 
     assert response.status_code == 409
 
+
 # ============================================================
 # Image utilisateur à l'inscription et modification ultérieure
 # ============================================================
 
+
 @patch("app.modules.auth.service.convert_image_to_webp")
 @patch("app.modules.auth.service.supabase_admin")
 def test_registration_uploads_optional_profile_image(
-    mock_supabase, mock_convert, auth_client,
+    mock_supabase,
+    mock_convert,
+    auth_client,
 ) -> None:
     """L'inscription accepte une photo facultative et retourne son URL."""
     client, test_session = auth_client
@@ -444,7 +447,9 @@ def test_registration_uploads_optional_profile_image(
 @patch("app.modules.auth.service.supabase_admin")
 @patch("app.modules.auth.service.convert_image_to_webp")
 def test_registration_does_not_create_user_when_avatar_upload_fails(
-    mock_convert, mock_supabase, auth_client,
+    mock_convert,
+    mock_supabase,
+    auth_client,
 ) -> None:
     client, test_session = auth_client
     mock_convert.return_value = b"fake_webp"
@@ -501,15 +506,19 @@ def test_public_user_image_route_is_removed(auth_client) -> None:
 @patch("app.modules.auth.service.convert_image_to_webp")
 @patch("app.modules.auth.service.supabase_admin")
 def test_aut10_user_can_replace_own_image(
-    mock_supabase, mock_convert, auth_client,
+    mock_supabase,
+    mock_convert,
+    auth_client,
 ) -> None:
     """AUT-10 : L'utilisateur peut remplacer sa propre photo."""
     client, test_session = auth_client
     res = client.post(
         "/api/v1/auth/register",
         data={
-            "firstname": "Jane", "lastname": "Doe",
-            "email": "jane4@example.com", "password": "a-very-strong-password",
+            "firstname": "Jane",
+            "lastname": "Doe",
+            "email": "jane4@example.com",
+            "password": "a-very-strong-password",
             "tel": "0612345678",
         },
     )
@@ -534,23 +543,29 @@ def test_aut10_rejects_other_user(auth_client) -> None:
     """AUT-10 : 403 si un utilisateur modifie la photo d'un autre."""
     client, _ = auth_client
 
-    res1 = client.post("/api/v1/auth/register", data={
-        "firstname": "Alice",   # 👈 était "A" (1 char → 422)
-        "lastname": "One",
-        "email": "user1@example.com",
-        "password": "a-very-strong-password",
-        "tel": "0600000001",
-    })
+    res1 = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Alice",  # 👈 était "A" (1 char → 422)
+            "lastname": "One",
+            "email": "user1@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0600000001",
+        },
+    )
     assert res1.status_code == 201  # 👈 vérifie le statut avant .json()
     token1 = res1.json()["access_token"]
 
-    res2 = client.post("/api/v1/auth/register", data={
-        "firstname": "Bob",     # 👈 était "B" (1 char → 422)
-        "lastname": "Two",
-        "email": "user2@example.com",
-        "password": "a-very-strong-password",
-        "tel": "0600000002",
-    })
+    res2 = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Bob",  # 👈 était "B" (1 char → 422)
+            "lastname": "Two",
+            "email": "user2@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0600000002",
+        },
+    )
     assert res2.status_code == 201
     user2_id = UUID(res2.json()["id_user"])
 

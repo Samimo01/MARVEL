@@ -213,9 +213,7 @@ def test_get_gauge(campaigns_client) -> None:
 
 @patch("app.modules.campaigns.service.convert_image_to_webp")
 @patch("app.modules.campaigns.service.supabase_admin")
-def test_cam12_upload_image_success(
-    mock_supabase, mock_convert, campaigns_client
-) -> None:
+def test_cam12_upload_image_success(mock_supabase, mock_convert, campaigns_client) -> None:
     """Teste l'upload réussi d'une image pour une campagne."""
     client, test_session = campaigns_client
     admin_id, token = _register_test_user(client, "admin_img1@example.com")
@@ -230,10 +228,7 @@ def test_cam12_upload_image_success(
     c_id = c["id_campaign"]
 
     mock_convert.return_value = b"fake_webp_bytes"
-    fake_url = (
-        "https://mock.supabase.co/storage/v1/object/public/"
-        "campaigns/test/cover.webp"
-    )
+    fake_url = "https://mock.supabase.co/storage/v1/object/public/campaigns/test/cover.webp"
     mock_supabase.storage.from_().get_public_url.return_value = fake_url
 
     response = client.post(
@@ -250,9 +245,7 @@ def test_cam12_upload_image_success(
 
 @patch("app.modules.campaigns.service.convert_image_to_webp")
 @patch("app.modules.campaigns.service.supabase_admin")
-def test_cam12_upload_image_already_exists(
-    mock_supabase, mock_convert, campaigns_client
-) -> None:
+def test_cam12_upload_image_already_exists(mock_supabase, mock_convert, campaigns_client) -> None:
     """Teste qu'on ne peut pas uploader une image si elle existe déjà (CAM-12)."""
     client, test_session = campaigns_client
     admin_id, token = _register_test_user(client, "admin_img2@example.com")
@@ -283,9 +276,7 @@ def test_cam12_upload_image_already_exists(
 
 @patch("app.modules.campaigns.service.convert_image_to_webp")
 @patch("app.modules.campaigns.service.supabase_admin")
-def test_cam13_replace_image_success(
-    mock_supabase, mock_convert, campaigns_client
-) -> None:
+def test_cam13_replace_image_success(mock_supabase, mock_convert, campaigns_client) -> None:
     """Teste le remplacement réussi d'une image existante (CAM-13)."""
     client, test_session = campaigns_client
     admin_id, token = _register_test_user(client, "admin_img3@example.com")
@@ -305,10 +296,7 @@ def test_cam13_replace_image_success(
         session.commit()
 
     mock_convert.return_value = b"fake_webp_bytes"
-    new_url = (
-        "https://mock.supabase.co/storage/v1/object/public/"
-        "campaigns/test/new_cover.webp"
-    )
+    new_url = "https://mock.supabase.co/storage/v1/object/public/campaigns/test/new_cover.webp"
     mock_supabase.storage.from_().get_public_url.return_value = new_url
 
     response = client.patch(
@@ -351,9 +339,7 @@ def test_image_url_is_persisted_in_db(campaigns_client) -> None:
     'campaigns' après un appel réussi à la route CAM-12.
     """
     client, test_session = campaigns_client
-    admin_id, token = _register_test_user(
-        client, "admin_img_db@example.com"
-    )
+    admin_id, token = _register_test_user(client, "admin_img_db@example.com")
     _assign_administrator_role(test_session, admin_id)
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -368,16 +354,12 @@ def test_image_url_is_persisted_in_db(campaigns_client) -> None:
         campaign_in_db = session.get(Campaign, campaign_id)
         assert campaign_in_db.image_url is None
 
-    fake_url = (
-        "https://mock.supabase.co/storage/v1/object/public/"
-        "campaigns/test/cover.webp"
-    )
+    fake_url = "https://mock.supabase.co/storage/v1/object/public/campaigns/test/cover.webp"
 
-    with patch(
-        "app.modules.campaigns.service.convert_image_to_webp"
-    ) as mock_convert, patch(
-        "app.modules.campaigns.service.supabase_admin"
-    ) as mock_supabase:
+    with (
+        patch("app.modules.campaigns.service.convert_image_to_webp") as mock_convert,
+        patch("app.modules.campaigns.service.supabase_admin") as mock_supabase,
+    ):
         mock_convert.return_value = b"fake_webp"
         mock_supabase.storage.from_().get_public_url.return_value = fake_url
 
@@ -392,17 +374,13 @@ def test_image_url_is_persisted_in_db(campaigns_client) -> None:
 
     with test_session() as session:
         campaign_in_db = session.get(Campaign, campaign_id)
-        assert (
-            campaign_in_db.image_url is not None
-        ), "L'image_url n'a pas été sauvegardée en base !"
-        assert (
-            campaign_in_db.image_url == fake_url
-        ), "L'URL en base ne correspond pas à celle retournée par Supabase"
+        assert campaign_in_db.image_url is not None, "L'image_url n'a pas été sauvegardée en base !"
+        assert campaign_in_db.image_url == fake_url, (
+            "L'URL en base ne correspond pas à celle retournée par Supabase"
+        )
 
 
-def _create_test_event(
-    client: TestClient, headers: dict, campaign_id: str
-) -> dict:
+def _create_test_event(client: TestClient, headers: dict, campaign_id: str) -> dict:
     payload = {
         "title": "Iftar Solidaire",
         "event_at": "2099-03-20T17:30:00Z",
@@ -470,9 +448,7 @@ def test_event_crud_success(campaigns_client) -> None:
 def test_event_creation_unauthorized(campaigns_client) -> None:
     client, test_session = campaigns_client
 
-    admin_id, admin_token = _register_test_user(
-        client, "admin_events_auth@example.com"
-    )
+    admin_id, admin_token = _register_test_user(client, "admin_events_auth@example.com")
     _assign_administrator_role(test_session, admin_id)
 
     campaign_response = client.post(
@@ -482,9 +458,7 @@ def test_event_creation_unauthorized(campaigns_client) -> None:
     )
     campaign_id = campaign_response.json()["id_campaign"]
 
-    _, user_token = _register_test_user(
-        client, "user_events_auth@example.com"
-    )
+    _, user_token = _register_test_user(client, "user_events_auth@example.com")
 
     response = client.post(
         f"/api/v1/campaigns/{campaign_id}/events",
@@ -503,9 +477,7 @@ def test_event_creation_unauthorized(campaigns_client) -> None:
 def test_event_creation_without_authentication(campaigns_client) -> None:
     client, test_session = campaigns_client
 
-    admin_id, token = _register_test_user(
-        client, "admin_events_noauth@example.com"
-    )
+    admin_id, token = _register_test_user(client, "admin_events_noauth@example.com")
     _assign_administrator_role(test_session, admin_id)
 
     campaign_response = client.post(
@@ -531,9 +503,7 @@ def test_event_creation_without_authentication(campaigns_client) -> None:
 def test_public_event_catalog(campaigns_client) -> None:
     client, test_session = campaigns_client
 
-    admin_id, token = _register_test_user(
-        client, "admin_events_catalog@example.com"
-    )
+    admin_id, token = _register_test_user(client, "admin_events_catalog@example.com")
     _assign_administrator_role(test_session, admin_id)
     headers = {"Authorization": f"Bearer {token}"}
 

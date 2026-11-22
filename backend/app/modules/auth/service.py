@@ -118,16 +118,12 @@ def register_user(
         raise
 
 
-def list_user_role_assignments(
-    session: Session, user_id: UUID
-) -> list[RoleAssignmentResponse]:
+def list_user_role_assignments(session: Session, user_id: UUID) -> list[RoleAssignmentResponse]:
     if session.get(User, user_id) is None:
         raise ManagedUserNotFoundError(f"Utilisateur {user_id} introuvable.")
 
     latest_by_role: dict[str, RoleAssignmentResponse] = {}
-    for assignment, role_name in repository.list_role_assignments_for_user(
-        session, user_id
-    ):
+    for assignment, role_name in repository.list_role_assignments_for_user(session, user_id):
         latest_by_role.setdefault(
             role_name,
             RoleAssignmentResponse(
@@ -168,9 +164,7 @@ def set_user_role_assignment(
         session.add(role)
         session.flush()
 
-    current_assignment = repository.get_latest_role_assignment(
-        session, user_id, role_name.value
-    )
+    current_assignment = repository.get_latest_role_assignment(session, user_id, role_name.value)
     if (
         current_assignment is not None
         and current_assignment.assignment_type == payload.assignment_type.value
@@ -213,14 +207,17 @@ def set_user_role_assignment(
         created_at=assignment.created_at,
     )
 
+
 # ============================================================
 # Exceptions images
 # ============================================================
 class UserNotFoundError(LookupError):
     pass
 
+
 class ImageAlreadyExistsError(ValueError):
     pass
+
 
 class UnauthorizedImageActionError(PermissionError):
     pass
@@ -252,9 +249,7 @@ def _upload_user_image(
 
 def _is_administrator(session: Session, user_id: UUID) -> bool:
     """Vérifie si l'utilisateur a un rôle Administrator actif."""
-    assignment = repository.get_latest_role_assignment(
-        session, user_id, "Administrator"
-    )
+    assignment = repository.get_latest_role_assignment(session, user_id, "Administrator")
     return assignment is not None and assignment.assignment_type == "assigned"
 
 
@@ -273,9 +268,7 @@ def upload_user_image(
         raise UserNotFoundError(f"Utilisateur {id_user} introuvable.")
 
     if user.image_url:
-        raise ImageAlreadyExistsError(
-            "Une image existe déjà. Utilisez PATCH /users/{id}/image."
-        )
+        raise ImageAlreadyExistsError("Une image existe déjà. Utilisez PATCH /users/{id}/image.")
 
     url = _upload_user_image(id_user, image_bytes, replace=False)
     user.image_url = url
@@ -303,9 +296,7 @@ def replace_user_image(
     is_admin = _is_administrator(session, current_user.id_user)
 
     if not is_self and not is_admin:
-        raise UnauthorizedImageActionError(
-            "Vous ne pouvez remplacer que votre propre photo."
-        )
+        raise UnauthorizedImageActionError("Vous ne pouvez remplacer que votre propre photo.")
 
     url = _upload_user_image(id_user, image_bytes, replace=True)
     target.image_url = url

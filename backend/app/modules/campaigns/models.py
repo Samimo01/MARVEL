@@ -19,23 +19,37 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 campaign_status_type = ENUM(
-    "Draft", "In_progress", "closed",
-    name="campaign_status", create_type=False,
+    "Draft",
+    "In_progress",
+    "closed",
+    name="campaign_status",
+    create_type=False,
 )
 
 campaign_category_type = ENUM(
-    "Food_aid", "Clothing_cover", "Hygienne", "Health",
-    "Education", "Urgence", "Other",
-    name="campaign_category", create_type=False,
+    "Food_aid",
+    "Clothing_cover",
+    "Hygienne",
+    "Health",
+    "Education",
+    "Urgence",
+    "Other",
+    name="campaign_category",
+    create_type=False,
 )
 
 donation_type_enum = ENUM(
-    "Mature", "Mixed", "Finnancial",
+    "Mature",
+    "Mixed",
+    "Finnancial",
     name="donation_type",
     create_type=False,
 )
+
+
 class ArrayOfEnum(types.TypeDecorator):
     """Utilise ARRAY sur PostgreSQL, et JSON sur SQLite (pour les tests)."""
+
     impl = types.JSON
     cache_ok = True
 
@@ -44,7 +58,7 @@ class ArrayOfEnum(types.TypeDecorator):
         super().__init__(*args, **kwargs)
 
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
+        if dialect.name == "postgresql":
             return dialect.type_descriptor(ARRAY(self.enum_type))
         else:
             return dialect.type_descriptor(types.JSON)
@@ -53,9 +67,7 @@ class ArrayOfEnum(types.TypeDecorator):
 class Campaign(Base):
     __tablename__ = "campaigns"
 
-    id_campaign: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid4
-    )
+    id_campaign: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(String)
     goal: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
@@ -82,38 +94,29 @@ class Campaign(Base):
         nullable=False,
     )
 
+
 class Event(Base):
     __tablename__ = "events"
 
-    id_event: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid4
-    )
+    id_event: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
 
     title: Mapped[str] = mapped_column(String, nullable=False)
-    description: Mapped[str | None] = mapped_column(String)          
-    expected_donation_types: Mapped[str | None] = mapped_column(     
-        donation_type_enum
-    )
-    event_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    description: Mapped[str | None] = mapped_column(String)
+    expected_donation_types: Mapped[str | None] = mapped_column(donation_type_enum)
+    event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     place: Mapped[str | None] = mapped_column(String)
 
     goal: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    updated_at: Mapped[datetime] = mapped_column(                   
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
     id_campaign: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("campaigns.id_campaign", ondelete="CASCADE"),
-        nullable=False
+        Uuid(as_uuid=True), ForeignKey("campaigns.id_campaign", ondelete="CASCADE"), nullable=False
     )
