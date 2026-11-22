@@ -5,7 +5,13 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Numeric, String, Uuid, func,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Uuid,
+    func,
 )
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import Mapped, mapped_column
@@ -14,7 +20,7 @@ from app.database import Base
 
 # Enumération définie dans votre script SQL
 financial_donation_status_type = ENUM(
-    "Failure", "Success",
+    "Failure", "Pending", "Success",
     name="financial_donation_status", create_type=False,
 )
 
@@ -33,7 +39,8 @@ class FinancialDon(Base):
     )
     failure_reason: Mapped[str | None] = mapped_column(String)
     reference_payment: Mapped[str | None] = mapped_column(String)
-    
+
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

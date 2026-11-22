@@ -1,6 +1,7 @@
 """Client Supabase pour le Storage."""
 
 from supabase import Client, create_client
+
 from app.config import settings
 
 supabase_admin: Client = create_client(

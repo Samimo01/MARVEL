@@ -38,8 +38,12 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column("password", String, nullable=False)
     tel: Mapped[str | None] = mapped_column(String)
-    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
-    is_email_enable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    is_email_enable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     image_url: Mapped[str | None] = mapped_column(String)
@@ -50,6 +54,7 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
 
 class Role(Base):
     __tablename__ = "roles"

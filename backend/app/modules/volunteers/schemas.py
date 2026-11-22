@@ -5,7 +5,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
 # =========================
 # MISSIONS
 # =========================
@@ -15,7 +14,7 @@ class MissionCreate(BaseModel):
     start_at: datetime | None = None
     finish_at: datetime | None = None
     seat_number: int | None = Field(default=None, ge=1)
-    skills: list[str] = Field(default_factory=list)
+    required_skills: list[str] = Field(default_factory=list)
     id_collect: UUID | None = None
     id_event: UUID | None = None
 
@@ -37,7 +36,7 @@ class MissionUpdate(BaseModel):
     start_at: datetime | None = None
     finish_at: datetime | None = None
     seat_number: int | None = Field(default=None, ge=1)
-    skills: list[str] | None = None
+    required_skills: list[str] | None = None
     id_collect: UUID | None = None
     id_event: UUID | None = None
 
@@ -65,7 +64,7 @@ class MissionResponse(BaseModel):
     start_at: datetime | None
     finish_at: datetime | None
     seat_number: int | None
-    skills: list[str]
+    required_skills: list[str]
     status: str
     id_collect: UUID | None
     id_event: UUID | None

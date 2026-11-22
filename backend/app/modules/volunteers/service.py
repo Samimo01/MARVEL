@@ -1,14 +1,13 @@
 
 """Logique métier du module volunteers."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.modules.volunteers import repository as repo
 from app.modules.volunteers.models import Mission, SignIn
-
 
 # =========================
 # EXCEPTIONS MÉTIER
@@ -315,7 +314,7 @@ def register_for_mission(
         or active_count < mission.seat_number
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     sign_in = SignIn(
         id_user=user_id,
@@ -352,7 +351,7 @@ def cancel_registration(
 
     sign_in.is_canceled = True
     sign_in.is_validated = False
-    sign_in.canceled_at = datetime.now(timezone.utc)
+    sign_in.canceled_at = datetime.now(UTC)
     sign_in.validated_at = None
 
     db.commit()
@@ -415,7 +414,7 @@ def validate_sign_in(
 
     sign_in.is_validated = is_validated
     sign_in.validated_at = (
-        datetime.now(timezone.utc) if is_validated else None
+        datetime.now(UTC) if is_validated else None
     )
 
     repo.update_sign_in(db, sign_in, {})
@@ -508,7 +507,7 @@ def get_my_space(
     """Construit le tableau de bord personnel du bénévole."""
 
     registrations = get_my_sign_ins(db, user_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     upcoming_missions = []
     history = []
@@ -521,10 +520,10 @@ def get_my_space(
         if mission_start is not None:
             if mission_start.tzinfo is None:
                 mission_start = mission_start.replace(
-                    tzinfo=timezone.utc
+                    tzinfo=UTC
                 )
             else:
-                mission_start = mission_start.astimezone(timezone.utc)
+                mission_start = mission_start.astimezone(UTC)
 
         is_upcoming = (
             sign_in.is_validated

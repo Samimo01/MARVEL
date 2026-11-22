@@ -1,12 +1,12 @@
 """Tests des routes API Missions et inscriptions des bénévoles : MIS-01 à MIS-15."""
 
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, String, JSON, event
+from sqlalchemy import JSON, String, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.types import TypeDecorator
@@ -14,7 +14,7 @@ from sqlalchemy.types import TypeDecorator
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
-from app.modules.auth.models import User, Role, RoleAssignment, RevokedToken
+from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign, Event
 from app.modules.natural_donations.models import Collect
 from app.modules.volunteers.models import Mission, SignIn
@@ -42,8 +42,8 @@ def mission_client(
         30 * 24 * 60,
     )
 
-    Mission.__table__.c.skills.type = SQLiteArray()
-    Mission.__table__.c.skills.server_default.arg = "'[]'"
+    Mission.__table__.c.required_skills.type = SQLiteArray()
+    Mission.__table__.c.required_skills.server_default.arg = "'[]'"
 
     Mission.__table__.c.status.type = String()
     Mission.__table__.c.status.server_default.arg = "'Publish'"
@@ -153,14 +153,14 @@ def assign_role(
 
 
 def create_mission_payload() -> dict:
-    start = datetime.now(timezone.utc) + timedelta(days=5)
+    start = datetime.now(UTC) + timedelta(days=5)
 
     return {
         "title": f"Mission test {uuid4().hex[:6]}",
         "start_at": start.isoformat(),
         "finish_at": (start + timedelta(hours=4)).isoformat(),
         "seat_number": 5,
-        "skills": ["Organisation", "Travail en équipe"],
+        "required_skills": ["Organisation", "Travail en équipe"],
     }
 
 
@@ -262,7 +262,7 @@ def test_mis01_create_mission(mission_client):
     assert data["title"] == payload["title"]
     assert data["status"] == "Draft"
     assert data["seat_number"] == 5
-    assert data["skills"] == payload["skills"]
+    assert data["required_skills"] == payload["required_skills"]
 
 
 # ---------------------------------------------------------------------
@@ -344,7 +344,7 @@ def test_mis04_update_mission(mission_client):
     payload = {
         "title": "Mission modifiée",
         "seat_number": 8,
-        "skills": ["Logistique", "Communication"],
+        "required_skills": ["Logistique", "Communication"],
     }
 
     response = client.put(
@@ -359,7 +359,7 @@ def test_mis04_update_mission(mission_client):
 
     assert data["title"] == payload["title"]
     assert data["seat_number"] == 8
-    assert data["skills"] == payload["skills"]
+    assert data["required_skills"] == payload["required_skills"]
 
 
 # ---------------------------------------------------------------------
@@ -454,9 +454,9 @@ def test_mis09_get_planning(mission_client):
 
     mission = create_mission(client, admin, publish=True)
 
-    date_from = datetime.now(timezone.utc).isoformat()
+    date_from = datetime.now(UTC).isoformat()
     date_to = (
-        datetime.now(timezone.utc) + timedelta(days=10)
+        datetime.now(UTC) + timedelta(days=10)
     ).isoformat()
 
     response = client.get(
