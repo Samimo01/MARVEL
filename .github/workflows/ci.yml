@@ -6,7 +6,6 @@ on:
   push:
     branches-ignore:
       - main
-
   # Exécuter la CI sur les PR ciblant main
   pull_request:
     branches:

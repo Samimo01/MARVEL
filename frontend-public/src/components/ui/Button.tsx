@@ -1,25 +1,38 @@
 import type { ButtonHTMLAttributes } from 'react'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  loading?: boolean
   variant?: 'primary' | 'secondary'
 }
 
-const variants = {
-  primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
-  secondary: 'border border-border bg-surface text-foreground hover:bg-surface-muted',
-}
-
+/** Bouton principal : hover, appui, désactivé et chargement. Le libellé est fourni par l'appelant. */
 export default function Button({
-  variant = 'primary',
+  loading = false,
+  disabled,
   className = '',
-  type = 'button',
+  children,
+  variant = 'primary',
   ...props
 }: ButtonProps) {
+  const variantClasses =
+    variant === 'secondary'
+      ? 'border border-border bg-surface-raised text-foreground shadow-none hover:bg-foreground/5 hover:shadow-none'
+      : 'bg-primary text-primary-foreground shadow-[0_12px_30px_rgba(255,107,74,.22)] hover:bg-primary-hover hover:shadow-[0_16px_36px_rgba(255,107,74,.32)]'
+
   return (
     <button
-      type={type}
-      className={`inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2 font-medium focus-visible:outline-2 disabled:opacity-50 ${variants[variant]} ${className}`}
       {...props}
-    />
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={`group inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl px-5 font-black transition duration-200 motion-safe:hover:-translate-y-0.5 active:translate-y-0 active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:translate-y-0 ${variantClasses} ${className}`}
+    >
+      {loading && (
+        <span
+          aria-hidden="true"
+          className="h-4 w-4 rounded-full border-2 border-current border-t-transparent motion-safe:animate-spin"
+        />
+      )}
+      {children}
+    </button>
   )
 }

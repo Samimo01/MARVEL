@@ -1,7 +1,7 @@
-import Card from '../../../components/ui/Card.tsx'
-import ProgressBar from '../../../components/ui/ProgressBar.tsx'
-import { formatAmount } from '../../../lib/format.ts'
-import type { Campaign } from '../types.ts'
+import Card from '@/components/ui/Card.tsx'
+import ProgressBar from '@/components/ui/ProgressBar.tsx'
+import { formatAmount } from '@/lib/format.ts'
+import type { Campaign } from '@/features/campaigns/types.ts'
 
 export default function CampaignCard({ campaign }: { campaign: Campaign }) {
   const collected = Number(campaign.collected_amount)

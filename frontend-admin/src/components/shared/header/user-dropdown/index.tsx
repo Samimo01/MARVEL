@@ -1,3 +1,4 @@
+import { config } from "@/app/config";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import {
   GearIcon,
   GlobeIcon,
   InfoCircleIcon,
+  LogOutIcon,
   UserCircleIcon,
 } from "@/icons";
 import { cn } from "@/utils";
@@ -31,6 +33,8 @@ export default function UserDropdown() {
   const changeLocale = useChangeLocale();
   const { pathname } = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [logoutPending, setLogoutPending] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
 
   const currentLang = getLanguage(locale);
   const CurrentFlagIcon = currentLang.FlagIcon;
@@ -40,14 +44,36 @@ export default function UserDropdown() {
     navigate(pathname, { replace: true });
   };
 
+  const handleLogout = async () => {
+    setLogoutPending(true);
+    setLogoutError("");
+    try {
+      const apiUrl = config.apiUrl.replace(/\/+$/, "");
+      const response = await fetch(`${apiUrl}/api/v1/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(`Impossible de se déconnecter (${response.status}).`);
+      }
+      window.location.replace(
+        `${config.publicUrl.replace(/\/+$/, "")}/auth?mode=login`,
+      );
+    } catch {
+      setLogoutError(t("logoutError"));
+      setLogoutPending(false);
+    }
+  };
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger className="dropdown-toggle flex items-center text-gray-700 dark:text-gray-400">
         <span className="me-3 flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-sm font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-          A
+          M
         </span>
 
-        <span className="me-1 block text-sm font-medium">Administrateur</span>
+        <span className="me-1 block text-sm font-medium">{t("team")}</span>
 
         <ChevronDownIcon
           className={cn(
@@ -60,7 +86,7 @@ export default function UserDropdown() {
       <DropdownMenuContent align="end" sideOffset={12} className="w-65 p-3">
         <div className="px-3 py-2">
           <span className="block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Administrateur
+            {t("team")}
           </span>
         </div>
 
@@ -142,7 +168,19 @@ export default function UserDropdown() {
         </DropdownMenuSub>
 
         <DropdownMenuSeparator />
-
+        {logoutError && (
+          <p role="alert" className="px-3 py-2 text-sm text-red-500">
+            {logoutError}
+          </p>
+        )}
+        <DropdownMenuItem
+          variant="destructive"
+          disabled={logoutPending}
+          onClick={handleLogout}
+        >
+          <LogOutIcon className="size-6" />
+          {logoutPending ? t("signingOut") : t("signOut")}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

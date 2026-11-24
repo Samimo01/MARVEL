@@ -14,6 +14,7 @@ from app.config import settings
 from app.core.dependencies import require_campaign_editor
 from app.database import Base, get_db
 from app.main import app
+from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 
 
@@ -27,6 +28,7 @@ def auth_client(
         "test-jwt-secret-for-tests-at-least-32-bytes",
     )
     monkeypatch.setattr(settings, "access_token_expire_minutes", 30 * 24 * 60)
+    monkeypatch.setattr(settings, "auth_cookie_secure", False)
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -57,7 +59,7 @@ def auth_client(
         engine.dispose()
 
 
-def test_registration_creates_user_and_returns_access_token(auth_client) -> None:
+def test_registration_creates_user_and_sets_a_persistent_http_only_cookie(auth_client) -> None:
     client, test_session = auth_client
     response = client.post(
         "/api/v1/auth/register",
@@ -74,9 +76,13 @@ def test_registration_creates_user_and_returns_access_token(auth_client) -> None
     assert response.json()["message"] == "Compte créé."
     assert response.json()["id_user"]
     assert response.json()["image_url"] is None
-    assert response.json()["token_type"] == "bearer"
+    assert "access_token" not in response.json()
+    assert "httponly" in response.headers["set-cookie"].lower()
+    assert "max-age=2592000" in response.headers["set-cookie"].lower()
+    access_token = response.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert access_token
     claims = jwt.decode(
-        response.json()["access_token"],
+        access_token,
         "test-jwt-secret-for-tests-at-least-32-bytes",
         algorithms=["HS256"],
     )
@@ -129,7 +135,7 @@ def test_registration_rejects_duplicate_email(auth_client) -> None:
         assert len(session.scalars(select(User)).all()) == 1
 
 
-def test_login_returns_a_persistent_access_token_for_valid_credentials(auth_client) -> None:
+def test_login_returns_a_persistent_http_only_cookie_for_valid_credentials(auth_client) -> None:
     client, _ = auth_client
     registration = client.post(
         "/api/v1/auth/register",
@@ -147,19 +153,148 @@ def test_login_returns_a_persistent_access_token_for_valid_credentials(auth_clie
         json={
             "email": "ADA@example.com",
             "password": "a-very-strong-password",
+            "remember_me": True,
         },
     )
 
     assert registration.status_code == 201
     assert response.status_code == 200
-    assert response.json()["token_type"] == "bearer"
+    assert response.json() == {"message": "Connexion réussie."}
+    assert "httponly" in response.headers["set-cookie"].lower()
+    assert "max-age=2592000" in response.headers["set-cookie"].lower()
+    access_token = response.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert access_token
     claims = jwt.decode(
-        response.json()["access_token"],
+        access_token,
         "test-jwt-secret-for-tests-at-least-32-bytes",
         algorithms=["HS256"],
     )
     assert claims["sub"] == registration.json()["id_user"]
     assert claims["exp"] - claims["iat"] == 30 * 24 * 60 * 60
+
+
+def test_login_uses_a_session_cookie_when_remember_me_is_false(auth_client) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "session@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "session@example.com",
+            "password": "a-very-strong-password",
+            "remember_me": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert "max-age=" not in response.headers["set-cookie"].lower()
+
+
+def test_current_session_keeps_an_unassigned_user_roleless(auth_client) -> None:
+    client, _ = auth_client
+    registration = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "visitor@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.get("/api/v1/users/me")
+
+    assert response.status_code == 200
+    assert response.json()["id_user"] == registration.json()["id_user"]
+    assert response.json()["user"] == {
+        "id_user": registration.json()["id_user"],
+        "firstname": "Ada",
+        "lastname": "Lovelace",
+        "nickname": None,
+        "email": "visitor@example.com",
+        "tel": "0612345678",
+        "image_url": None,
+        "active": True,
+        "created_at": response.json()["user"]["created_at"],
+    }
+    assert response.json()["roles"] == []
+
+
+def test_current_session_returns_only_active_roles(auth_client) -> None:
+    client, test_session = auth_client
+    registration = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "volunteer@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    user_id = UUID(registration.json()["id_user"])
+
+    with test_session() as session:
+        volunteer_role = Role(role_name="Volunteer")
+        manager_role = Role(role_name="Collection_Manager")
+        session.add_all([volunteer_role, manager_role])
+        session.flush()
+        session.add_all(
+            [
+                RoleAssignment(
+                    id_user=user_id,
+                    id_role=volunteer_role.id_role,
+                    assignment_type="assigned",
+                ),
+                RoleAssignment(
+                    id_user=user_id,
+                    id_role=manager_role.id_role,
+                    assignment_type="revoked",
+                ),
+            ]
+        )
+        session.commit()
+
+    response = client.get("/api/v1/users/me")
+
+    assert response.status_code == 200
+    assert response.json()["user"]["email"] == "volunteer@example.com"
+    assert response.json()["roles"] == ["Volunteer"]
+
+
+def test_cookie_logout_requires_a_trusted_origin_and_clears_the_cookie(auth_client) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "cookie-logout@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    blocked = client.post("/api/v1/auth/logout")
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert blocked.status_code == 403
+    assert response.status_code == 200
+    assert "max-age=0" in response.headers["set-cookie"].lower()
 
 
 def test_login_rejects_invalid_credentials_with_the_same_response(auth_client) -> None:
@@ -201,14 +336,17 @@ def test_logout_revokes_only_the_current_token(auth_client) -> None:
             "tel": "0612345678",
         },
     )
-    first_token = registration.json()["access_token"]
-    second_token = client.post(
+    first_token = registration.cookies.get(ACCESS_TOKEN_COOKIE)
+    second_login = client.post(
         "/api/v1/auth/login",
         json={
             "email": "logout@example.com",
             "password": "a-very-strong-password",
+            "remember_me": True,
         },
-    ).json()["access_token"]
+    )
+    second_token = second_login.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert first_token and second_token
 
     logout_response = client.post(
         "/api/v1/auth/logout",
@@ -287,7 +425,9 @@ def test_unassigned_user_cannot_close_a_campaign(auth_client) -> None:
 
     response = client.post(
         "/api/v1/campaigns/00000000-0000-0000-0000-000000000001/close",
-        headers={"Authorization": f"Bearer {registration.json()['access_token']}"},
+        headers={
+            "Authorization": f"Bearer {registration.cookies.get(ACCESS_TOKEN_COOKIE)}"
+        },
     )
 
     assert response.status_code == 403
@@ -305,7 +445,9 @@ def _register_test_user(client: TestClient, email: str) -> tuple[UUID, str]:
         },
     )
     assert response.status_code == 201
-    return UUID(response.json()["id_user"]), response.json()["access_token"]
+    token = response.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert token
+    return UUID(response.json()["id_user"]), token
 
 
 def _assign_administrator_role(test_session, user_id: UUID) -> None:
@@ -523,7 +665,8 @@ def test_aut10_user_can_replace_own_image(
         },
     )
     user_id = UUID(res.json()["id_user"])
-    token = res.json()["access_token"]
+    token = res.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert token
 
     mock_convert.return_value = b"fake_webp"
     new_url = "https://mock.supabase.co/storage/v1/object/public/users/new.webp"
@@ -554,7 +697,8 @@ def test_aut10_rejects_other_user(auth_client) -> None:
         },
     )
     assert res1.status_code == 201  # 👈 vérifie le statut avant .json()
-    token1 = res1.json()["access_token"]
+    token1 = res1.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert token1
 
     res2 = client.post(
         "/api/v1/auth/register",

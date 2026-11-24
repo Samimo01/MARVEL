@@ -14,6 +14,7 @@ from sqlalchemy.types import TypeDecorator
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
+from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign, Event
 from app.modules.natural_donations.models import Collect
@@ -122,10 +123,9 @@ def register_user(
 
     assert response.status_code == 201, response.text
 
-    return (
-        UUID(response.json()["id_user"]),
-        response.json()["access_token"],
-    )
+    token = response.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert token
+    return UUID(response.json()["id_user"]), token
 
 
 def assign_role(

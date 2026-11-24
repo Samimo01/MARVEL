@@ -135,6 +135,25 @@ Vérifier que le fichier est ignoré par Git :
 git check-ignore infra/.env
 ```
 
+### 4.6 Session et redirections selon le rôle
+
+La connexion utilise un cookie JWT `HttpOnly`, sans stocker le jeton dans le
+JavaScript ni dans la base de données. Le cookie de session disparaît à la
+fermeture du navigateur ; l'option « Rester connecté » lui donne une durée de
+vie alignée sur celle du jeton définie par `ACCESS_TOKEN_EXPIRE_MINUTES`.
+
+En local, les applications sont disponibles sur `http://localhost:8080`
+(vitrine) et `http://localhost:8081` (backoffice). Renseigner
+`VITE_PUBLIC_URL` et `VITE_ADMIN_URL` si ces adresses diffèrent. Pour un
+déploiement HTTPS, définir impérativement `AUTH_COOKIE_SECURE=true`. Les
+origines exactes des deux frontends (schéma, hôte et port) doivent figurer dans
+`CORS_ORIGINS`, notamment si les frontends sont lancés avec Vite.
+
+Les comptes sans rôle actif, ainsi que les bénévoles, restent sur la vitrine.
+Les rôles `Collection_Manager`, `Stock_Manager`, `Treasurer` et
+`Administrator` accèdent au backoffice. Les autorisations des API restent
+vérifiées côté backend.
+
 ## 5. Construction et démarrage
 
 Toutes les commandes suivantes sont exécutées depuis la racine du projet MARVEL.

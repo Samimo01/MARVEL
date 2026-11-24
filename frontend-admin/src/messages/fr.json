@@ -43,11 +43,14 @@
     }
   },
   "userDropdown": {
+    "team": "Équipe MARVEL",
     "editProfile": "Modifier le profil",
     "accountSettings": "Paramètres du compte",
     "support": "Assistance",
     "language": "Langue",
-    "signOut": "Se déconnecter"
+    "signOut": "Se déconnecter",
+    "signingOut": "Déconnexion…",
+    "logoutError": "Impossible de se déconnecter. Veuillez réessayer."
   },
   "notFound": {
     "error": "ERREUR",

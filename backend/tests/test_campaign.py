@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
+from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign, Event
 from app.modules.financial_donations.models import FinancialDon
@@ -75,7 +76,9 @@ def _register_test_user(client: TestClient, email: str) -> tuple[UUID, str]:
         },
     )
     assert response.status_code == 201
-    return UUID(response.json()["id_user"]), response.json()["access_token"]
+    token = response.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert token
+    return UUID(response.json()["id_user"]), token
 
 
 def _assign_administrator_role(test_session, user_id: UUID) -> None:
@@ -487,6 +490,7 @@ def test_event_creation_without_authentication(campaigns_client) -> None:
     )
     campaign_id = campaign_response.json()["id_campaign"]
 
+    client.cookies.clear()
     response = client.post(
         f"/api/v1/campaigns/{campaign_id}/events",
         json={

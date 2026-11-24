@@ -17,6 +17,8 @@ COPY . .
 # URL de l'API (vide = appels relatifs /api)
 ARG VITE_API_URL=""
 ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_ADMIN_URL="http://localhost:8081"
+ENV VITE_ADMIN_URL=$VITE_ADMIN_URL
 
 # Compilation de l'application React / Vite
 RUN npm run build

@@ -39,18 +39,16 @@ class RegistrationResponse(BaseModel):
     id_user: UUID
     nickname: str | None = None
     image_url: str | None = None
-    access_token: str
-    token_type: str = "bearer"
+
+
+class AuthResponse(BaseModel):
+    message: str
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: SecretStr = Field(min_length=1)
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+    remember_me: bool = False
 
 
 class LogoutResponse(BaseModel):
@@ -63,6 +61,26 @@ class RoleName(StrEnum):
     STOCK_MANAGER = "Stock_Manager"
     TREASURER = "Treasurer"
     ADMINISTRATOR = "Administrator"
+
+
+class UserOut(BaseModel):
+    id_user: UUID
+    firstname: str
+    lastname: str
+    nickname: str | None = None
+    email: EmailStr
+    tel: str | None = None
+    image_url: str | None = None
+    active: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AuthSessionResponse(BaseModel):
+    id_user: UUID
+    user: UserOut
+    roles: list[RoleName] = Field(default_factory=list)
 
 
 class RoleAssignmentStatus(StrEnum):
@@ -81,17 +99,3 @@ class RoleAssignmentResponse(BaseModel):
     role_name: RoleName
     assignment_type: RoleAssignmentStatus
     created_at: datetime
-
-
-class UserOut(BaseModel):
-    id_user: UUID
-    firstname: str
-    lastname: str
-    nickname: str | None = None
-    email: EmailStr
-    tel: str | None = None
-    image_url: str | None = None
-    active: bool
-    created_at: datetime
-
-    model_config = {"from_attributes": True}

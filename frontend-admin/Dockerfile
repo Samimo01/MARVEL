@@ -12,6 +12,12 @@ RUN npm ci
 # Copie du code source
 COPY . .
 
+# URLs utilisées lors de la validation de session et des redirections.
+ARG VITE_API_URL=""
+ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_PUBLIC_URL="http://localhost:8080"
+ENV VITE_PUBLIC_URL=$VITE_PUBLIC_URL
+
 # Compilation React / TypeScript / Vite
 RUN npm run build
 
