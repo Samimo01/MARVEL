@@ -37,7 +37,7 @@ export function login(payload: LoginPayload): Promise<AuthResponse> {
 }
 
 export function getCurrentSession(): Promise<AuthSession> {
-  return apiRequest<AuthSession>('/auth/me')
+  return apiRequest<AuthSession>('/users/me')
 }
 
 export function logout(): Promise<{ message: string }> {

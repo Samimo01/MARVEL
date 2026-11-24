@@ -213,13 +213,22 @@ def test_current_session_keeps_an_unassigned_user_roleless(auth_client) -> None:
         },
     )
 
-    response = client.get("/api/v1/auth/me")
+    response = client.get("/api/v1/users/me")
 
     assert response.status_code == 200
-    assert response.json() == {
+    assert response.json()["id_user"] == registration.json()["id_user"]
+    assert response.json()["user"] == {
         "id_user": registration.json()["id_user"],
-        "roles": [],
+        "firstname": "Ada",
+        "lastname": "Lovelace",
+        "nickname": None,
+        "email": "visitor@example.com",
+        "tel": "0612345678",
+        "image_url": None,
+        "active": True,
+        "created_at": response.json()["user"]["created_at"],
     }
+    assert response.json()["roles"] == []
 
 
 def test_current_session_returns_only_active_roles(auth_client) -> None:
@@ -257,9 +266,10 @@ def test_current_session_returns_only_active_roles(auth_client) -> None:
         )
         session.commit()
 
-    response = client.get("/api/v1/auth/me")
+    response = client.get("/api/v1/users/me")
 
     assert response.status_code == 200
+    assert response.json()["user"]["email"] == "volunteer@example.com"
     assert response.json()["roles"] == ["Volunteer"]
 
 

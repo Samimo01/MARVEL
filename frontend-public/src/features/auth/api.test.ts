@@ -63,6 +63,17 @@ describe('auth api', () => {
       ok: true,
       json: async () => ({
         id_user: 'user-id',
+        user: {
+          id_user: 'user-id',
+          firstname: 'Ada',
+          lastname: 'Lovelace',
+          nickname: null,
+          email: 'ada@example.com',
+          tel: '0612345678',
+          image_url: null,
+          active: true,
+          created_at: '2026-01-01T00:00:00Z',
+        },
         roles: ['Collection_Manager'],
       }),
     })
@@ -70,9 +81,20 @@ describe('auth api', () => {
 
     await expect(getCurrentSession()).resolves.toEqual({
       id_user: 'user-id',
+      user: {
+        id_user: 'user-id',
+        firstname: 'Ada',
+        lastname: 'Lovelace',
+        nickname: null,
+        email: 'ada@example.com',
+        tel: '0612345678',
+        image_url: null,
+        active: true,
+        created_at: '2026-01-01T00:00:00Z',
+      },
       roles: ['Collection_Manager'],
     })
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/auth/me')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/users/me')
     expect((fetchMock.mock.calls[0][1] as RequestInit).credentials).toBe('include')
   })
 })

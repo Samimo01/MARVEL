@@ -10,6 +10,17 @@ export type RegistrationResponse = AuthResponse & {
 
 export type AuthSession = {
   id_user: string
+  user: {
+    id_user: string
+    firstname: string
+    lastname: string
+    nickname: string | null
+    email: string
+    tel: string | null
+    image_url: string | null
+    active: boolean
+    created_at: string
+  }
   roles: RoleName[]
 }
 

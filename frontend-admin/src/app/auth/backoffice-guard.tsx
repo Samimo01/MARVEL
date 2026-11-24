@@ -31,7 +31,7 @@ export default function BackofficeGuard({ children }: BackofficeGuardProps) {
 
       try {
         const apiUrl = config.apiUrl.replace(/\/+$/, '')
-        const response = await fetch(`${apiUrl}/api/v1/auth/me`, {
+        const response = await fetch(`${apiUrl}/api/v1/users/me`, {
           credentials: 'include',
           headers: { Accept: 'application/json' },
           signal: controller.signal,

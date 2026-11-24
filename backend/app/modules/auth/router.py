@@ -87,13 +87,14 @@ def logout(
     return LogoutResponse(message="Déconnexion réussie.")
 
 
-@router.get("/me", response_model=AuthSessionResponse)
+@users_router.get("/me", response_model=AuthSessionResponse)
 def current_session(
     db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> AuthSessionResponse:
     return AuthSessionResponse(
         id_user=current_user.id_user,
+        user=UserOut.model_validate(current_user),
         roles=service.list_active_user_roles(db, current_user.id_user),
     )
 
