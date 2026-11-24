@@ -23,6 +23,7 @@ from app.modules.volunteers.models import Mission, SignIn
 
 class SQLiteArray(TypeDecorator):
     """Remplace ARRAY PostgreSQL par JSON dans SQLite."""
+
     impl = JSON
     cache_ok = True
 
@@ -103,6 +104,7 @@ def mission_client(
 # Fonctions auxiliaires
 # ---------------------------------------------------------------------
 
+
 def register_user(
     client: TestClient,
     email: str,
@@ -133,9 +135,7 @@ def assign_role(
 ) -> None:
 
     with test_session() as session:
-        role = session.query(Role).filter_by(
-            role_name=role_name
-        ).first()
+        role = session.query(Role).filter_by(role_name=role_name).first()
 
         if role is None:
             role = Role(role_name=role_name)
@@ -243,6 +243,7 @@ def register_volunteer_for_mission(
 # MIS-01 : Créer une mission
 # ---------------------------------------------------------------------
 
+
 def test_mis01_create_mission(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -268,6 +269,7 @@ def test_mis01_create_mission(mission_client):
 # ---------------------------------------------------------------------
 # MIS-02 : Consulter la liste des missions
 # ---------------------------------------------------------------------
+
 
 def test_mis02_list_missions(mission_client):
     client, test_session = mission_client
@@ -311,6 +313,7 @@ def test_mis02_list_missions(mission_client):
 # MIS-03 : Consulter les détails d'une mission
 # ---------------------------------------------------------------------
 
+
 def test_mis03_get_mission_details(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -334,6 +337,7 @@ def test_mis03_get_mission_details(mission_client):
 # ---------------------------------------------------------------------
 # MIS-04 : Modifier une mission
 # ---------------------------------------------------------------------
+
 
 def test_mis04_update_mission(mission_client):
     client, test_session = mission_client
@@ -366,6 +370,7 @@ def test_mis04_update_mission(mission_client):
 # MIS-05 : Supprimer une mission en brouillon
 # ---------------------------------------------------------------------
 
+
 def test_mis05_delete_draft_mission(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -391,6 +396,7 @@ def test_mis05_delete_draft_mission(mission_client):
 # MIS-06 : Publier une mission
 # ---------------------------------------------------------------------
 
+
 def test_mis06_publish_mission(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -409,6 +415,7 @@ def test_mis06_publish_mission(mission_client):
 # ---------------------------------------------------------------------
 # MIS-07 : Terminer une mission
 # ---------------------------------------------------------------------
+
 
 def test_mis07_complete_mission(mission_client):
     client, test_session = mission_client
@@ -429,6 +436,7 @@ def test_mis07_complete_mission(mission_client):
 # MIS-08 : Annuler une mission
 # ---------------------------------------------------------------------
 
+
 def test_mis08_cancel_mission(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -448,6 +456,7 @@ def test_mis08_cancel_mission(mission_client):
 # MIS-09 : Consulter le planning
 # ---------------------------------------------------------------------
 
+
 def test_mis09_get_planning(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -455,9 +464,7 @@ def test_mis09_get_planning(mission_client):
     mission = create_mission(client, admin, publish=True)
 
     date_from = datetime.now(UTC).isoformat()
-    date_to = (
-        datetime.now(UTC) + timedelta(days=10)
-    ).isoformat()
+    date_to = (datetime.now(UTC) + timedelta(days=10)).isoformat()
 
     response = client.get(
         "/api/v1/planning",
@@ -483,6 +490,7 @@ def test_mis09_get_planning(mission_client):
 # MIS-10 : Consulter les inscriptions d'une mission
 # ---------------------------------------------------------------------
 
+
 def test_mis10_get_mission_sign_ins(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -502,6 +510,7 @@ def test_mis10_get_mission_sign_ins(mission_client):
 # MIS-11 : Valider ou refuser une inscription
 # ---------------------------------------------------------------------
 
+
 def test_mis11_validate_sign_in(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -518,8 +527,7 @@ def test_mis11_validate_sign_in(mission_client):
     assert registration.status_code == 201, registration.text
 
     response = client.patch(
-        f"/api/v1/missions/{mission['id_mission']}/sign-ins/"
-        f"{volunteer['id']}/validation",
+        f"/api/v1/missions/{mission['id_mission']}/sign-ins/{volunteer['id']}/validation",
         json={"is_validated": False},
         headers=admin["headers"],
     )
@@ -529,8 +537,7 @@ def test_mis11_validate_sign_in(mission_client):
 
     # Réactiver la validation
     response = client.patch(
-        f"/api/v1/missions/{mission['id_mission']}/sign-ins/"
-        f"{volunteer['id']}/validation",
+        f"/api/v1/missions/{mission['id_mission']}/sign-ins/{volunteer['id']}/validation",
         json={"is_validated": True},
         headers=admin["headers"],
     )
@@ -542,6 +549,7 @@ def test_mis11_validate_sign_in(mission_client):
 # ---------------------------------------------------------------------
 # MIS-12 : S'inscrire à une mission
 # ---------------------------------------------------------------------
+
 
 def test_mis12_register_for_mission(mission_client):
     client, test_session = mission_client
@@ -570,6 +578,7 @@ def test_mis12_register_for_mission(mission_client):
 # ---------------------------------------------------------------------
 # MIS-13 : Annuler sa propre inscription
 # ---------------------------------------------------------------------
+
 
 def test_mis13_cancel_own_registration(mission_client):
     client, test_session = mission_client
@@ -605,6 +614,7 @@ def test_mis13_cancel_own_registration(mission_client):
 # MIS-14 : Consulter ses propres inscriptions
 # ---------------------------------------------------------------------
 
+
 def test_mis14_get_my_sign_ins(mission_client):
     client, test_session = mission_client
     admin = create_admin(client, test_session)
@@ -638,6 +648,7 @@ def test_mis14_get_my_sign_ins(mission_client):
 # ---------------------------------------------------------------------
 # MIS-15 : Consulter l'espace personnel du bénévole
 # ---------------------------------------------------------------------
+
 
 def test_mis15_get_volunteer_space(mission_client):
     client, test_session = mission_client

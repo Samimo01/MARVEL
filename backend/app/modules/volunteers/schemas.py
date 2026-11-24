@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # MISSIONS
 # =========================
 
+
 class MissionCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     start_at: datetime | None = None
@@ -25,9 +26,7 @@ class MissionCreate(BaseModel):
             and self.finish_at is not None
             and self.finish_at <= self.start_at
         ):
-            raise ValueError(
-                "La date de fin doit être après la date de début."
-            )
+            raise ValueError("La date de fin doit être après la date de début.")
         return self
 
 
@@ -45,14 +44,8 @@ class MissionUpdate(BaseModel):
         start = self.start_at
         finish = self.finish_at
 
-        if (
-            start is not None
-            and finish is not None
-            and finish <= start
-        ):
-            raise ValueError(
-                "La date de fin doit être après la date de début."
-            )
+        if start is not None and finish is not None and finish <= start:
+            raise ValueError("La date de fin doit être après la date de début.")
         return self
 
 
@@ -78,6 +71,7 @@ class MissionDetailResponse(MissionResponse):
 # =========================
 # INSCRIPTIONS
 # =========================
+
 
 class SignInResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -105,6 +99,7 @@ class MissionRegistrationResponse(BaseModel):
 # MIS-14
 # =========================
 
+
 class MySignInResponse(BaseModel):
     """Une inscription accompagnée des informations de sa mission."""
 
@@ -117,6 +112,7 @@ class MySignInResponse(BaseModel):
 # TABLEAU DE BORD DU BÉNÉVOLE
 # MIS-15
 # =========================
+
 
 class VolunteerSpaceResponse(BaseModel):
     """Données du tableau de bord personnel du bénévole."""

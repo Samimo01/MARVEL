@@ -12,3 +12,4 @@ supabase_admin: Client = create_client(
 CAMPAIGNS_BUCKET = "campaigns"
 NATURAL_DONATIONS_BUCKET = "natural_donations"
 USERS_BUCKET = "users"
+TREASURY_BUCKET = "treasury_justificatives"

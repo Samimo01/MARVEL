@@ -1,59 +1,34 @@
 
-name: MARVEL CI
+name: CI
 
 on:
+  # Exécuter la CI à chaque push sur toutes les branches sauf main
   push:
-    branches:
+    branches-ignore:
       - main
-      - master
-      - feature/devops-dockerisation
-      - feat/frontend-auth
-
+  # Exécuter la CI sur les PR ciblant main
   pull_request:
     branches:
       - main
-      - master
-      - feature/devops-dockerisation
 
+  # Permettre le lancement manuel
   workflow_dispatch:
 
+# Permissions minimales
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
-
   # ==========================================
-  # 0. DETECTION DES FICHIERS MODIFIES
-  # ==========================================
-  changes:
-    name: Detect Changes
-    runs-on: ubuntu-latest
-
-    outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect changed files
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-
-  # ==========================================
-  # 1. BACKEND : RUFF ET PYTEST
+  # BACKEND
   # ==========================================
   backend:
-    name: Backend - Lint and Tests
+    name: Backend - Lint & Tests
     runs-on: ubuntu-latest
-    needs: changes
+
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
       - name: Checkout repository
@@ -67,26 +42,26 @@ jobs:
           cache-dependency-path: backend/requirements-dev.txt
 
       - name: Install dependencies
-        working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Ruff lint
-        if: needs.changes.outputs.backend == 'true'
-        working-directory: backend
-        run: ruff check app tests
+      - name: Run Ruff
+        run: ruff check .
 
-      - name: Run backend tests
-        working-directory: backend
+      - name: Run Pytest
         run: pytest -v
 
   # ==========================================
-  # 2. FRONTEND PUBLIC : LINT, TESTS ET BUILD
+  # FRONTEND PUBLIC
   # ==========================================
   frontend-public:
-    name: Frontend Public - Lint, Tests and Build
+    name: Frontend Public - Lint, Tests & Build
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend-public
 
     steps:
       - name: Checkout repository
@@ -100,27 +75,30 @@ jobs:
           cache-dependency-path: frontend-public/package-lock.json
 
       - name: Install dependencies
-        working-directory: frontend-public
         run: npm ci
 
-      - name: Run lint
-        working-directory: frontend-public
+      - name: Run ESLint
         run: npm run lint
 
       - name: Run tests
-        working-directory: frontend-public
-        run: npm run test
+        run: npm test
 
-      - name: Build frontend
-        working-directory: frontend-public
+      - name: Run security audit
+        run: npm audit --audit-level=high
+
+      - name: Build application
         run: npm run build
 
   # ==========================================
-  # 3. FRONTEND ADMIN : LINT ET BUILD
+  # FRONTEND ADMIN
   # ==========================================
   frontend-admin:
-    name: Frontend Admin - Lint and Build
+    name: Frontend Admin - Lint & Build
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend-admin
 
     steps:
       - name: Checkout repository
@@ -134,34 +112,59 @@ jobs:
           cache-dependency-path: frontend-admin/package-lock.json
 
       - name: Install dependencies
-        working-directory: frontend-admin
         run: npm ci
 
-      - name: Run lint
-        working-directory: frontend-admin
+      - name: Run ESLint
         run: npm run lint
 
-      - name: Build frontend
-        working-directory: frontend-admin
+      # - name: Run tests
+      #   run: npm test
+
+      - name: Run security audit
+        run: npm audit --audit-level=high
+
+      - name: Build application
         run: npm run build
 
   # ==========================================
-  # 4. CONSTRUCTION DES IMAGES DOCKER
+  # GITLEAKS - SECRET SCANNING
+  # ==========================================
+  gitleaks:
+    name: Security - Gitleaks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==========================================
+  # DOCKER - BUILD IMAGES
   # ==========================================
   docker:
-    name: Docker Build - ${{ matrix.service }}
+    name: Docker - Build ${{ matrix.component }}
     runs-on: ubuntu-latest
+
+    # Ne construire les images que si les vérifications passent
+    needs:
+      - backend
+      - frontend-public
+      - frontend-admin
+      - gitleaks
 
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - service: backend
-            context: ./backend
-          - service: frontend-public
-            context: ./frontend-public
-          - service: frontend-admin
-            context: ./frontend-admin
+        component:
+          - backend
+          - frontend-public
+          - frontend-admin
 
     steps:
       - name: Checkout repository
@@ -173,26 +176,9 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.context }}
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
           push: false
-          tags: marvel-${{ matrix.service }}:ci
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-
-  # ==========================================
-  # 5. DETECTION DES SECRETS AVEC GITLEAKS
-  # ==========================================
-  gitleaks:
-    name: Security - Gitleaks
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout full repository history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Scan repository for secrets
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tags: marvel-${{ matrix.component }}:ci
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}

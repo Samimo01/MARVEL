@@ -26,6 +26,7 @@ events_table = table(
 # MISSIONS
 # =========================
 
+
 def create_mission(db: Session, data: dict) -> Mission:
     mission = Mission(**data)
     db.add(mission)
@@ -43,11 +44,7 @@ def get_mission_for_update(
     mission_id: UUID,
 ) -> Mission | None:
     """Verrouille la mission pendant une inscription."""
-    query = (
-        select(Mission)
-        .where(Mission.id_mission == mission_id)
-        .with_for_update()
-    )
+    query = select(Mission).where(Mission.id_mission == mission_id).with_for_update()
     return db.scalar(query)
 
 
@@ -87,9 +84,7 @@ def get_mission_place(db: Session, mission: Mission) -> str | None:
         return db.scalar(query)
 
     if mission.id_event:
-        query = select(events_table.c.place).where(
-            events_table.c.id_event == mission.id_event
-        )
+        query = select(events_table.c.place).where(events_table.c.id_event == mission.id_event)
         return db.scalar(query)
 
     return None
@@ -118,6 +113,7 @@ def delete_mission(db: Session, mission: Mission) -> None:
 # =========================
 # INSCRIPTIONS
 # =========================
+
 
 def count_active_sign_ins(db: Session, mission_id: UUID) -> int:
     query = (
@@ -149,11 +145,7 @@ def get_sign_in(
 
 
 def list_sign_ins(db: Session, mission_id: UUID) -> list[SignIn]:
-    query = (
-        select(SignIn)
-        .where(SignIn.id_mission == mission_id)
-        .order_by(SignIn.application_date)
-    )
+    query = select(SignIn).where(SignIn.id_mission == mission_id).order_by(SignIn.application_date)
 
     return list(db.scalars(query).all())
 

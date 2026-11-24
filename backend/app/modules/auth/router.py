@@ -114,17 +114,13 @@ async def register(
     ] = None,
 ) -> RegistrationResponse:
     image_bytes = await image.read() if image is not None else None
-    if image_bytes is not None and not (image.content_type or "").startswith(
-        "image/"
-    ):
+    if image_bytes is not None and not (image.content_type or "").startswith("image/"):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "Le fichier fourni n'est pas une image.",
         )
     try:
-        user, access_token = service.register_user(
-            db, payload, image_bytes=image_bytes
-        )
+        user, access_token = service.register_user(db, payload, image_bytes=image_bytes)
     except DuplicateAccountError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ImageAlreadyExistsError as exc:

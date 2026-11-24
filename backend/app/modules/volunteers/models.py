@@ -40,14 +40,10 @@ class Mission(Base):
 
     title: Mapped[str] = mapped_column(String, nullable=False)
 
-    start_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
-    description: Mapped[str | None] = mapped_column(String)     
+    start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    description: Mapped[str | None] = mapped_column(String)
 
-    finish_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    finish_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     seat_number: Mapped[int | None] = mapped_column(Integer)
 
@@ -107,10 +103,6 @@ class SignIn(Base):
         server_default=text("false"),
     )
 
-    canceled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    validated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

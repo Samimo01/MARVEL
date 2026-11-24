@@ -33,6 +33,7 @@ def create_access_token(subject: str) -> str:
         algorithm=settings.jwt_algorithm,
     )
 
+
 def decode_token(token: str) -> dict:
     """Décode et valide un token JWT. Lève une erreur si invalide."""
     return jwt.decode(

@@ -84,9 +84,7 @@ def cam11_create_draft_campaign(
 ):
     """CAM-11 : Créer une campagne en mode brouillon."""
     try:
-        return campaign_service.create_draft_campaign(
-            session, user=user, payload=payload
-        )
+        return campaign_service.create_draft_campaign(session, user=user, payload=payload)
     except CampaignTitleAlreadyExistsError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
@@ -185,9 +183,7 @@ def cat09_deactivate_campaign(
 ):
     """CAT-09 : Rendre invisible (repasser en brouillon)."""
     try:
-        return campaign_service.deactivate_campaign(
-            session, user=user, id_campaign=id_campaign
-        )
+        return campaign_service.deactivate_campaign(session, user=user, id_campaign=id_campaign)
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
@@ -200,9 +196,7 @@ def cat10_delete_campaign(
 ):
     """CAT-10 : Supprimer une campagne."""
     try:
-        campaign_service.delete_campaign(
-            session, user=user, id_campaign=id_campaign
-        )
+        campaign_service.delete_campaign(session, user=user, id_campaign=id_campaign)
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
@@ -215,9 +209,7 @@ def cam03_publish_campaign(
 ):
     """CAM-03 : Publier une campagne (Brouillon -> En_Cours)."""
     try:
-        return campaign_service.publish_campaign_action(
-            session, user=user, id_campaign=id_campaign
-        )
+        return campaign_service.publish_campaign_action(session, user=user, id_campaign=id_campaign)
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except InvalidStatusTransitionError as exc:
@@ -333,9 +325,7 @@ def cam10_create_event(
     user: CampaignEditor,
 ):
     try:
-        return campaign_service.create_event(
-            session, id_campaign=id_campaign, payload=payload
-        )
+        return campaign_service.create_event(session, id_campaign=id_campaign, payload=payload)
     except CampaignNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
@@ -347,9 +337,7 @@ def cam11_list_events(
     event_at: datetime | None = None,
     id_campaign: UUID | None = None,
 ):
-    return campaign_service.list_events(
-        session, event_at=event_at, id_campaign=id_campaign
-    )
+    return campaign_service.list_events(session, event_at=event_at, id_campaign=id_campaign)
 
 
 @events_router.get("/{id_event}", response_model=EventOut)
@@ -372,9 +360,7 @@ def cam13_update_event(
     user: CampaignEditor,
 ):
     try:
-        return campaign_service.update_event(
-            session, id_event=id_event, payload=payload
-        )
+        return campaign_service.update_event(session, id_event=id_event, payload=payload)
     except EventNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 

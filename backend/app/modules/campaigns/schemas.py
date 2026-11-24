@@ -26,6 +26,7 @@ class CampaignBase(BaseModel):
 class CampaignCreate(CampaignBase):
     """CAT-07 â€” POST /campaigns."""
 
+
 class CampaignUpdate(BaseModel):
     """CAT-08 â€” PUT /campaigns/{id}. Tous optionnels."""
 
@@ -44,6 +45,7 @@ class CampaignUpdate(BaseModel):
 # ============================================================
 class CampaignOut(CampaignBase):
     """Sortie complÃ¨te (gestion / admin)."""
+
     id_campaign: UUID
     status: str
     closed_at: datetime | None
@@ -57,6 +59,7 @@ class CampaignOut(CampaignBase):
 
 class CampaignPublic(BaseModel):
     """SchÃ©ma public de base pour une campagne."""
+
     id_campaign: UUID
     title: str
     description: str | None
@@ -71,11 +74,13 @@ class CampaignPublic(BaseModel):
 
 class CampaignProgressOut(CampaignPublic):
     """Campagne publique avec jauge."""
+
     progress_percent: float = Field(0.0, ge=0, le=100)
 
 
 class GaugeOut(BaseModel):
     """CAM-05 : Jauge de progression."""
+
     id_campaign: UUID
     goal: Decimal | None
     collected: Decimal
@@ -84,6 +89,7 @@ class GaugeOut(BaseModel):
 
 class FinancialDonOut(BaseModel):
     """CAM-06 : Dons rattachÃ©s Ã  une campagne."""
+
     id_don_f: UUID
     amount: Decimal
     status: str
@@ -92,15 +98,17 @@ class FinancialDonOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # ============================================================
 # Ã‰vÃ©nements de collecte
 # ============================================================
+
 
 class EventCreate(BaseModel):
     """CAM-10 â€” CrÃ©ation d'un Ã©vÃ©nement."""
 
     title: str = Field(..., min_length=1, max_length=200)
-    description: str | None = None                 
+    description: str | None = None
     expected_donation_types: str | None = None
     event_at: datetime | None = None
     place: str | None = None
@@ -111,7 +119,7 @@ class EventUpdate(BaseModel):
     """CAM-13 â€” Modification d'un Ã©vÃ©nement."""
 
     title: str | None = Field(None, min_length=1, max_length=200)
-    description: str | None = None                 
+    description: str | None = None
     expected_donation_types: str | None = None
     event_at: datetime | None = None
     place: str | None = None
@@ -124,8 +132,8 @@ class EventOut(BaseModel):
     id_event: UUID
     id_campaign: UUID
     title: str
-    description: str | None                  
-    expected_donation_types: str | None 
+    description: str | None
+    expected_donation_types: str | None
     event_at: datetime | None
     place: str | None
     goal: Decimal | None
