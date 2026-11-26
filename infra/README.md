@@ -137,10 +137,17 @@ git check-ignore infra/.env
 
 ### 4.6 Session et redirections selon le rôle
 
-La connexion utilise un cookie JWT `HttpOnly`, sans stocker le jeton dans le
-JavaScript ni dans la base de données. Le cookie de session disparaît à la
-fermeture du navigateur ; l'option « Rester connecté » lui donne une durée de
-vie alignée sur celle du jeton définie par `ACCESS_TOKEN_EXPIRE_MINUTES`.
+La connexion utilise des cookies `HttpOnly` : un jeton d'accès JWT de 15 minutes
+et un refresh token opaque dont la durée de vie est de 30 jours d'inactivité. Les
+jetons ne sont pas stockés dans le JavaScript. Seul le hash SHA-256 du refresh token
+est conservé en base. À chaque appel à `/api/v1/auth/refresh`, le refresh token est
+renouvelé; la réutilisation d'un ancien token révoque toute la famille de session.
+La déconnexion révoque les jetons de la session courante. « Rester connecté » rend
+le cookie refresh persistant; sinon, il disparaît à la fermeture du navigateur.
+
+Ces durées sont configurables avec `ACCESS_TOKEN_EXPIRE_MINUTES` et
+`REFRESH_TOKEN_EXPIRE_DAYS`. La table `refresh_tokens` est créée par les migrations
+Alembic : exécuter `alembic upgrade head` avant le démarrage de l'API.
 
 En local, les applications sont disponibles sur `http://localhost:8080`
 (vitrine) et `http://localhost:8081` (backoffice). Renseigner
