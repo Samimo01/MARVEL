@@ -126,6 +126,22 @@ def require_natural_donation_staff(
     )
 
 
+def require_beneficiary_file_staff(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
+) -> User:
+    """Autorise la consultation des dossiers bénéficiaires par l'équipe habilitée."""
+    for role_name in ("Collection_Manager", "Stock_Manager", "Administrator"):
+        assignment = auth_repo.get_latest_role_assignment(session, user.id_user, role_name)
+        if assignment is not None and assignment.assignment_type == "assigned":
+            return user
+
+    raise HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        "Rôle requis : Collection_Manager, Stock_Manager ou Administrator.",
+    )
+
+
 def require_stock_manager_or_admin(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_db)],
