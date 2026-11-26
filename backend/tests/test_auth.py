@@ -1097,18 +1097,18 @@ def test_aut09_user_image_route_uses_auth_prefix(
         f"/api/v1/auth/{user_id}/image",
         files={"image": ("avatar.png", b"fake_png", "image/png")},
     )
-    legacy_response = client.post(
+    users_route_response = client.post(
         f"/api/v1/users/{user_id}/image",
         files={"image": ("avatar.png", b"fake_png", "image/png")},
     )
 
     assert response.status_code == 200
-    assert legacy_response.status_code == 404
+    assert users_route_response.status_code == 405
 
 
 @patch("app.modules.auth.service.convert_image_to_webp")
 @patch("app.modules.auth.service.supabase_admin")
-def test_aut10_user_can_replace_own_image(
+def test_aut10_user_can_replace_own_image_on_users_route(
     mock_supabase,
     mock_convert,
     auth_client,
@@ -1134,7 +1134,7 @@ def test_aut10_user_can_replace_own_image(
     mock_supabase.storage.from_().get_public_url.return_value = new_url
 
     response = client.patch(
-        f"/api/v1/auth/{user_id}/image",
+        f"/api/v1/users/{user_id}/image",
         files={"image": ("avatar.png", b"fake_png", "image/png")},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1142,13 +1142,13 @@ def test_aut10_user_can_replace_own_image(
     assert response.status_code == 200
     assert response.json()["image_url"] == new_url
 
-    legacy_response = client.patch(
-        f"/api/v1/users/{user_id}/image",
+    auth_route_response = client.patch(
+        f"/api/v1/auth/{user_id}/image",
         files={"image": ("avatar.png", b"fake_png", "image/png")},
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    assert legacy_response.status_code == 404
+    assert auth_route_response.status_code == 405
 
 
 def test_aut10_rejects_other_user(auth_client) -> None:
@@ -1183,7 +1183,7 @@ def test_aut10_rejects_other_user(auth_client) -> None:
     user2_id = UUID(res2.json()["id_user"])
 
     response = client.patch(
-        f"/api/v1/auth/{user2_id}/image",
+        f"/api/v1/users/{user2_id}/image",
         files={"image": ("avatar.png", b"fake", "image/png")},
         headers={"Authorization": f"Bearer {token1}"},
     )

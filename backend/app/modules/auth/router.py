@@ -319,7 +319,7 @@ async def aut09_upload_user_image(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@router.patch("/{id_user}/image", response_model=UserOut)
+@users_router.patch("/{id_user}/image", response_model=UserOut)
 async def aut10_replace_user_image(
     id_user: UUID,
     image: Annotated[

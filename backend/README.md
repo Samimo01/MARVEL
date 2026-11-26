@@ -124,6 +124,14 @@ fourni, doit contenir 10 chiffres et commencer par `05`, `06` ou `07`. Le télé
 un corps vide ou invalide retourne `422`. La même restriction de domaine s'applique à
 l'inscription.
 
+## Photo de profil
+
+`POST /api/v1/auth/{id_user}/image` permet d'ajouter une première photo si le compte
+n'en possède pas déjà une. Pour remplacer la photo existante, utiliser
+`PATCH /api/v1/users/{id_user}/image`; l'utilisateur peut modifier sa propre photo, et
+un administrateur peut modifier celle d'un autre utilisateur. Lors de l'inscription,
+une photo facultative peut aussi être envoyée directement avec `POST /api/v1/auth/register`.
+
 ## Modification du mot de passe
 
 `PATCH /api/v1/users/me/password` exige le mot de passe actuel, un nouveau mot de passe
