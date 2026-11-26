@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from uuid import UUID
 
@@ -14,8 +15,8 @@ from app.config import settings
 from app.core.dependencies import require_campaign_editor
 from app.database import Base, get_db
 from app.main import app
-from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE
-from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
+from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
+from app.modules.auth.models import RefreshToken, RevokedToken, Role, RoleAssignment, User
 
 
 @pytest.fixture()
@@ -27,7 +28,8 @@ def auth_client(
         "jwt_secret_key",
         "test-jwt-secret-for-tests-at-least-32-bytes",
     )
-    monkeypatch.setattr(settings, "access_token_expire_minutes", 30 * 24 * 60)
+    monkeypatch.setattr(settings, "access_token_expire_minutes", 15)
+    monkeypatch.setattr(settings, "refresh_token_expire_days", 30)
     monkeypatch.setattr(settings, "auth_cookie_secure", False)
     engine = create_engine(
         "sqlite://",
@@ -39,6 +41,7 @@ def auth_client(
         Role.__table__,
         RoleAssignment.__table__,
         RevokedToken.__table__,
+        RefreshToken.__table__,
     ]
     Base.metadata.create_all(engine, tables=auth_tables)
     test_session = sessionmaker(bind=engine, autoflush=False)
@@ -79,20 +82,26 @@ def test_registration_creates_user_and_sets_a_persistent_http_only_cookie(auth_c
     assert "access_token" not in response.json()
     assert "httponly" in response.headers["set-cookie"].lower()
     assert "max-age=2592000" in response.headers["set-cookie"].lower()
+    assert "max-age=900" in response.headers["set-cookie"].lower()
     access_token = response.cookies.get(ACCESS_TOKEN_COOKIE)
+    refresh_token = response.cookies.get(REFRESH_TOKEN_COOKIE)
     assert access_token
+    assert refresh_token
     claims = jwt.decode(
         access_token,
         "test-jwt-secret-for-tests-at-least-32-bytes",
         algorithms=["HS256"],
     )
     assert claims["sub"] == response.json()["id_user"]
-    assert claims["exp"] > claims["iat"]
+    assert claims["exp"] - claims["iat"] == 15 * 60
 
     with test_session() as session:
         user = session.scalar(select(User).where(User.email == "ada@example.com"))
         assert user is not None
         assert user.password_hash != "a-very-strong-password"
+        stored_refresh_token = session.scalar(select(RefreshToken))
+        assert stored_refresh_token is not None
+        assert stored_refresh_token.token_hash != refresh_token
 
 
 def test_registration_rejects_a_weak_jwt_secret(auth_client, monkeypatch) -> None:
@@ -162,15 +171,18 @@ def test_login_returns_a_persistent_http_only_cookie_for_valid_credentials(auth_
     assert response.json() == {"message": "Connexion réussie."}
     assert "httponly" in response.headers["set-cookie"].lower()
     assert "max-age=2592000" in response.headers["set-cookie"].lower()
+    assert "max-age=900" in response.headers["set-cookie"].lower()
     access_token = response.cookies.get(ACCESS_TOKEN_COOKIE)
+    refresh_token = response.cookies.get(REFRESH_TOKEN_COOKIE)
     assert access_token
+    assert refresh_token
     claims = jwt.decode(
         access_token,
         "test-jwt-secret-for-tests-at-least-32-bytes",
         algorithms=["HS256"],
     )
     assert claims["sub"] == registration.json()["id_user"]
-    assert claims["exp"] - claims["iat"] == 30 * 24 * 60 * 60
+    assert claims["exp"] - claims["iat"] == 15 * 60
 
 
 def test_login_uses_a_session_cookie_when_remember_me_is_false(auth_client) -> None:
@@ -197,7 +209,121 @@ def test_login_uses_a_session_cookie_when_remember_me_is_false(auth_client) -> N
 
     assert response.status_code == 200
     assert response.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert response.cookies.get(REFRESH_TOKEN_COOKIE)
     assert "max-age=" not in response.headers["set-cookie"].lower()
+
+
+def test_refresh_rotates_tokens_and_revokes_the_family_on_reuse(auth_client) -> None:
+    client, test_session = auth_client
+    registration = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "refresh@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    old_refresh_token = registration.cookies.get(REFRESH_TOKEN_COOKIE)
+    assert old_refresh_token
+
+    refreshed = client.post(
+        "/api/v1/auth/refresh",
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert refreshed.status_code == 200
+    assert refreshed.json() == {"message": "Session renouvelée."}
+    new_refresh_token = refreshed.cookies.get(REFRESH_TOKEN_COOKIE)
+    new_access_token = refreshed.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert new_refresh_token and new_refresh_token != old_refresh_token
+    assert new_access_token
+    access_claims = jwt.decode(
+        new_access_token,
+        "test-jwt-secret-for-tests-at-least-32-bytes",
+        algorithms=["HS256"],
+    )
+    assert access_claims["exp"] - access_claims["iat"] == 15 * 60
+    assert client.get("/api/v1/users/me").status_code == 200
+
+    with test_session() as session:
+        token_records = list(session.scalars(select(RefreshToken)).all())
+        assert len(token_records) == 2
+        assert token_records[0].family_id == token_records[1].family_id
+        assert sum(record.revoked_at is not None for record in token_records) == 1
+
+    reused = client.post(
+        "/api/v1/auth/refresh",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Cookie": f"{REFRESH_TOKEN_COOKIE}={old_refresh_token}",
+        },
+    )
+    family_after_reuse = client.post(
+        "/api/v1/auth/refresh",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Cookie": f"{REFRESH_TOKEN_COOKIE}={new_refresh_token}",
+        },
+    )
+
+    assert reused.status_code == 401
+    assert family_after_reuse.status_code == 401
+    with test_session() as session:
+        assert all(
+            record.revoked_at is not None
+            for record in session.scalars(select(RefreshToken)).all()
+        )
+
+
+def test_refresh_rejects_missing_cookie_and_untrusted_origin(auth_client) -> None:
+    client, _ = auth_client
+
+    missing_cookie = client.post(
+        "/api/v1/auth/refresh",
+        headers={"Origin": "http://localhost:5173"},
+    )
+    untrusted_origin = client.post(
+        "/api/v1/auth/refresh",
+        headers={"Origin": "https://untrusted.example"},
+    )
+
+    assert missing_cookie.status_code == 401
+    assert "max-age=0" in missing_cookie.headers["set-cookie"].lower()
+    assert untrusted_origin.status_code == 403
+
+
+def test_refresh_rejects_an_expired_refresh_token(auth_client) -> None:
+    client, test_session = auth_client
+    registration = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "expired-refresh@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    refresh_token = registration.cookies.get(REFRESH_TOKEN_COOKIE)
+    assert refresh_token
+
+    with test_session() as session:
+        token_record = session.scalar(select(RefreshToken))
+        assert token_record is not None
+        token_record.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        session.commit()
+
+    response = client.post(
+        "/api/v1/auth/refresh",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Cookie": f"{REFRESH_TOKEN_COOKIE}={refresh_token}",
+        },
+    )
+
+    assert response.status_code == 401
 
 
 def test_current_session_keeps_an_unassigned_user_roleless(auth_client) -> None:
@@ -346,7 +472,9 @@ def test_logout_revokes_only_the_current_token(auth_client) -> None:
         },
     )
     second_token = second_login.cookies.get(ACCESS_TOKEN_COOKIE)
+    second_refresh_token = second_login.cookies.get(REFRESH_TOKEN_COOKIE)
     assert first_token and second_token
+    assert second_refresh_token
 
     logout_response = client.post(
         "/api/v1/auth/logout",
@@ -365,6 +493,14 @@ def test_logout_revokes_only_the_current_token(auth_client) -> None:
     assert logout_response.json() == {"message": "Déconnexion réussie."}
     assert repeated_logout.status_code == 401
     assert other_session_logout.status_code == 200
+    rejected_refresh = client.post(
+        "/api/v1/auth/refresh",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Cookie": f"{REFRESH_TOKEN_COOKIE}={second_refresh_token}",
+        },
+    )
+    assert rejected_refresh.status_code == 401
 
     with test_session() as session:
         assert len(session.scalars(select(RevokedToken)).all()) == 2

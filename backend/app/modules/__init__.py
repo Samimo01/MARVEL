@@ -4,12 +4,13 @@
 MODULES = [
     "auth",
     "campaigns",
-    "donations",
+    "financial_donations",
+    "natural_donations",
     "receipts",
     "stock",
     "beneficiaries",
     "distributions",
-    "budget",
+    "treasury",
     "volunteers",
     "dashboard",
 ]

@@ -1,10 +1,14 @@
-from datetime import UTC, datetime
-from uuid import UUID
+import hashlib
+import secrets
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.image_utils import convert_image_to_webp
 from app.core.security import (
     create_access_token,
@@ -15,7 +19,7 @@ from app.core.security import (
 )
 from app.core.supabase_client import USERS_BUCKET, supabase_admin
 from app.modules.auth import repository
-from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
+from app.modules.auth.models import RefreshToken, RevokedToken, Role, RoleAssignment, User
 from app.modules.auth.schemas import (
     LoginRequest,
     RegistrationRequest,
@@ -34,6 +38,17 @@ class InvalidCredentialsError(ValueError):
     pass
 
 
+class InvalidRefreshTokenError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class AuthTokens:
+    access_token: str
+    refresh_token: str
+    persistent: bool
+
+
 class ManagedUserNotFoundError(LookupError):
     pass
 
@@ -42,7 +57,59 @@ class CannotRevokeLastAdministratorError(ValueError):
     pass
 
 
-def authenticate_user(session: Session, payload: LoginRequest) -> str:
+def _hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _issue_refresh_token(
+    session: Session,
+    *,
+    user_id: UUID,
+    persistent: bool,
+    family_id: UUID | None = None,
+) -> str:
+    if settings.refresh_token_expire_days <= 0:
+        raise RuntimeError("REFRESH_TOKEN_EXPIRE_DAYS doit être supérieur à zéro.")
+
+    now = datetime.now(UTC)
+    session.execute(
+        delete(RefreshToken)
+        .where(RefreshToken.expires_at <= now)
+        .execution_options(synchronize_session=False)
+    )
+    token = secrets.token_urlsafe(64)
+    session.add(
+        RefreshToken(
+            token_hash=_hash_refresh_token(token),
+            family_id=family_id or uuid4(),
+            id_user=user_id,
+            persistent=persistent,
+            expires_at=now + timedelta(days=settings.refresh_token_expire_days),
+        )
+    )
+    return token
+
+
+def _issue_auth_tokens(
+    session: Session,
+    *,
+    user_id: UUID,
+    persistent: bool,
+    family_id: UUID | None = None,
+) -> AuthTokens:
+    return AuthTokens(
+        access_token=create_access_token(str(user_id)),
+        refresh_token=_issue_refresh_token(
+            session,
+            user_id=user_id,
+            persistent=persistent,
+            family_id=family_id,
+        ),
+        persistent=persistent,
+    )
+
+
+def authenticate_user(session: Session, payload: LoginRequest) -> AuthTokens:
     email = str(payload.email).strip().lower()
     user = repository.get_user_by_email(session, email)
     if (
@@ -55,7 +122,77 @@ def authenticate_user(session: Session, payload: LoginRequest) -> str:
     ):
         raise InvalidCredentialsError("E-mail ou mot de passe incorrect.")
 
-    return create_access_token(str(user.id_user))
+    tokens = _issue_auth_tokens(
+        session,
+        user_id=user.id_user,
+        persistent=payload.remember_me,
+    )
+    session.commit()
+    return tokens
+
+
+def rotate_refresh_token(session: Session, token: str) -> AuthTokens:
+    now = datetime.now(UTC)
+    token_record = session.scalar(
+        select(RefreshToken)
+        .where(RefreshToken.token_hash == _hash_refresh_token(token))
+        .with_for_update()
+    )
+    if token_record is None:
+        raise InvalidRefreshTokenError
+
+    if token_record.revoked_at is not None:
+        _revoke_refresh_family(session, token_record.family_id, now)
+        session.commit()
+        raise InvalidRefreshTokenError
+
+    expires_at = token_record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at <= now:
+        token_record.revoked_at = now
+        session.commit()
+        raise InvalidRefreshTokenError
+
+    user = session.get(User, token_record.id_user)
+    if user is None or not user.active:
+        _revoke_refresh_family(session, token_record.family_id, now)
+        session.commit()
+        raise InvalidRefreshTokenError
+
+    token_record.revoked_at = now
+    tokens = _issue_auth_tokens(
+        session,
+        user_id=user.id_user,
+        persistent=token_record.persistent,
+        family_id=token_record.family_id,
+    )
+    session.commit()
+    return tokens
+
+
+def _revoke_refresh_family(session: Session, family_id: UUID, now: datetime) -> None:
+    session.execute(
+        update(RefreshToken)
+        .where(
+            RefreshToken.family_id == family_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+
+
+def revoke_refresh_token(session: Session, *, token: str, user_id: UUID) -> None:
+    token_record = session.scalar(
+        select(RefreshToken)
+        .where(RefreshToken.token_hash == _hash_refresh_token(token))
+        .with_for_update()
+    )
+    if token_record is None or token_record.id_user != user_id:
+        return
+
+    _revoke_refresh_family(session, token_record.family_id, datetime.now(UTC))
+    session.commit()
 
 
 def revoke_access_token(session: Session, *, token: str, user_id: UUID) -> None:
@@ -84,7 +221,7 @@ def register_user(
     payload: RegistrationRequest,
     *,
     image_bytes: bytes | None = None,
-) -> tuple[User, str]:
+) -> tuple[User, AuthTokens]:
     email = str(payload.email).strip().lower()
 
     try:
@@ -100,7 +237,11 @@ def register_user(
             tel=payload.tel,
         )
         repository.add_user(session, user)
-        access_token = create_access_token(str(user.id_user))
+        tokens = _issue_auth_tokens(
+            session,
+            user_id=user.id_user,
+            persistent=True,
+        )
         if image_bytes is not None:
             user.image_url = _upload_user_image(
                 user.id_user,
@@ -109,7 +250,7 @@ def register_user(
             )
         session.commit()
         session.refresh(user)
-        return user, access_token
+        return user, tokens
     except IntegrityError as exc:
         session.rollback()
         raise DuplicateAccountError("L'adresse e-mail ou le pseudonyme est déjà utilisé.") from exc

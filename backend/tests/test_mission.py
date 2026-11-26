@@ -15,7 +15,7 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE
-from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
+from app.modules.auth.models import RefreshToken, RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign, Event
 from app.modules.natural_donations.models import Collect
 from app.modules.volunteers.models import Mission, SignIn
@@ -69,6 +69,7 @@ def mission_client(
         Role.__table__,
         RoleAssignment.__table__,
         RevokedToken.__table__,
+        RefreshToken.__table__,
         Campaign.__table__,
         Event.__table__,
         Collect.__table__,

@@ -79,7 +79,7 @@ En production, mettre ici les domaines réels.
 ## Création de compte
 
 `POST /api/v1/auth/register` crée un compte à partir du prénom, du nom, de l'e-mail,
-du mot de passe et du téléphone, puis renvoie un token d'accès JWT de type Bearer.
+du mot de passe et du téléphone, puis ouvre une session avec des cookies `HttpOnly`.
 La clé `JWT_SECRET_KEY` doit contenir au moins 32 octets et être définie dans `.env`
 (génération : `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
 Aucun rôle n'est attribué à l'inscription. Un administrateur peut consulter les rôles
@@ -97,11 +97,21 @@ Le catalogue public des campagnes reste accessible sans ces rôles.
 
 ## Connexion
 
-`POST /api/v1/auth/login` accepte une adresse e-mail et un mot de passe, puis renvoie
-un JWT de type Bearer si les identifiants sont valides. Le token expire après 30 jours
-par défaut (`ACCESS_TOKEN_EXPIRE_MINUTES=43200`). Le frontend peut le conserver dans
-`localStorage` et l'envoyer dans l'en-tête `Authorization: Bearer <token>` pour ses
-requêtes authentifiées.
+`POST /api/v1/auth/login` accepte une adresse e-mail et un mot de passe. Les jetons ne
+sont pas renvoyés dans le JSON ni stockés dans `localStorage` : ils sont transmis dans
+des cookies `HttpOnly`, `SameSite=Lax`.
+
+- Le jeton d'accès JWT expire après 15 minutes (`ACCESS_TOKEN_EXPIRE_MINUTES=15`).
+- Le refresh token opaque expire après 30 jours d'inactivité
+  (`REFRESH_TOKEN_EXPIRE_DAYS=30`). Avec « Rester connecté », le cookie est persistant;
+  sinon, c'est un cookie de session navigateur.
+- `POST /api/v1/auth/refresh` renouvelle les cookies et fait tourner le refresh token.
+  Seul le hash SHA-256 du refresh token est stocké en base.
+- La réutilisation d'un refresh token déjà renouvelé révoque toute sa famille de session.
+  `POST /api/v1/auth/logout` révoque les jetons de la session courante.
+
+Pour la production, configurer `AUTH_COOKIE_SECURE=true` et exécuter les migrations
+Alembic (`alembic upgrade head`) afin de créer la table `refresh_tokens`.
 
 ## Base de données (Alembic)
 

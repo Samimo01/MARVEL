@@ -7,16 +7,29 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Request,
     Response,
     UploadFile,
     status,
 )
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_access_token, get_current_user, require_administrator
+from app.core.dependencies import (
+    get_access_token,
+    get_current_user,
+    require_administrator,
+    validate_cookie_origin,
+)
 from app.database import get_db
 from app.modules.auth import service
-from app.modules.auth.cookies import clear_access_token_cookie, set_access_token_cookie
+from app.modules.auth.cookies import (
+    REFRESH_TOKEN_COOKIE,
+    clear_access_token_cookie,
+    clear_refresh_token_cookie,
+    set_access_token_cookie,
+    set_refresh_token_cookie,
+)
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     AuthResponse,
@@ -35,6 +48,7 @@ from app.modules.auth.service import (
     DuplicateAccountError,
     ImageAlreadyExistsError,
     InvalidCredentialsError,
+    InvalidRefreshTokenError,
     ManagedUserNotFoundError,
     UnauthorizedImageActionError,
     UserNotFoundError,
@@ -56,7 +70,7 @@ def login(
     db: DbSession,
 ) -> AuthResponse:
     try:
-        access_token = service.authenticate_user(db, payload)
+        tokens = service.authenticate_user(db, payload)
     except InvalidCredentialsError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -65,14 +79,59 @@ def login(
         ) from exc
     set_access_token_cookie(
         response,
-        access_token,
+        tokens.access_token,
         persistent=payload.remember_me,
+    )
+    set_refresh_token_cookie(
+        response,
+        tokens.refresh_token,
+        persistent=tokens.persistent,
     )
     return AuthResponse(message="Connexion réussie.")
 
 
+@router.post("/refresh", response_model=AuthResponse)
+def refresh(
+    request: Request,
+    response: Response,
+    db: DbSession,
+) -> AuthResponse | JSONResponse:
+    validate_cookie_origin(request)
+    token = request.cookies.get(REFRESH_TOKEN_COOKIE)
+    if not token:
+        return _invalid_refresh_response()
+
+    try:
+        tokens = service.rotate_refresh_token(db, token)
+    except InvalidRefreshTokenError:
+        return _invalid_refresh_response()
+
+    set_access_token_cookie(
+        response,
+        tokens.access_token,
+        persistent=tokens.persistent,
+    )
+    set_refresh_token_cookie(
+        response,
+        tokens.refresh_token,
+        persistent=tokens.persistent,
+    )
+    return AuthResponse(message="Session renouvelée.")
+
+
+def _invalid_refresh_response() -> JSONResponse:
+    response = JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={"detail": "Refresh token invalide ou expiré."},
+    )
+    clear_access_token_cookie(response)
+    clear_refresh_token_cookie(response)
+    return response
+
+
 @router.post("/logout", response_model=LogoutResponse)
 def logout(
+    request: Request,
     response: Response,
     token: Annotated[str, Depends(get_access_token)],
     db: DbSession,
@@ -83,7 +142,15 @@ def logout(
         token=token,
         user_id=current_user.id_user,
     )
+    refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE)
+    if refresh_token:
+        service.revoke_refresh_token(
+            db,
+            token=refresh_token,
+            user_id=current_user.id_user,
+        )
     clear_access_token_cookie(response)
+    clear_refresh_token_cookie(response)
     return LogoutResponse(message="Déconnexion réussie.")
 
 
@@ -120,13 +187,14 @@ async def register(
             "Le fichier fourni n'est pas une image.",
         )
     try:
-        user, access_token = service.register_user(db, payload, image_bytes=image_bytes)
+        user, tokens = service.register_user(db, payload, image_bytes=image_bytes)
     except DuplicateAccountError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ImageAlreadyExistsError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
-    set_access_token_cookie(response, access_token, persistent=True)
+    set_access_token_cookie(response, tokens.access_token, persistent=tokens.persistent)
+    set_refresh_token_cookie(response, tokens.refresh_token, persistent=tokens.persistent)
     return RegistrationResponse(
         message="Compte créé.",
         id_user=user.id_user,

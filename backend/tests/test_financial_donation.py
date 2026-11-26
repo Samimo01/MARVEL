@@ -12,7 +12,7 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE
-from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
+from app.modules.auth.models import RefreshToken, RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign
 from app.modules.financial_donations.models import FinancialDon
 
@@ -39,6 +39,7 @@ def donations_client(
         Role.__table__,
         RoleAssignment.__table__,
         RevokedToken.__table__,
+        RefreshToken.__table__,
         Campaign.__table__,
         FinancialDon.__table__,
     ]
