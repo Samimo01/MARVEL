@@ -634,15 +634,42 @@ def test_aut09_rejects_non_image(auth_client) -> None:
         assert session.scalar(select(User)) is None
 
 
-def test_public_user_image_route_is_removed(auth_client) -> None:
+@patch("app.modules.auth.service.convert_image_to_webp")
+@patch("app.modules.auth.service.supabase_admin")
+def test_aut09_user_image_route_uses_auth_prefix(
+    mock_supabase,
+    mock_convert,
+    auth_client,
+) -> None:
     client, _ = auth_client
+    mock_convert.return_value = b"fake_webp"
+    mock_supabase.storage.from_().get_public_url.return_value = (
+        "https://mock.supabase.co/storage/v1/object/public/users/avatar.webp"
+    )
+
+    registration = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Jane",
+            "lastname": "Doe",
+            "email": "jane-image@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    user_id = registration.json()["id_user"]
 
     response = client.post(
-        "/api/v1/auth/00000000-0000-0000-0000-000000000001/image",
+        f"/api/v1/auth/{user_id}/image",
+        files={"image": ("avatar.png", b"fake_png", "image/png")},
+    )
+    legacy_response = client.post(
+        f"/api/v1/users/{user_id}/image",
         files={"image": ("avatar.png", b"fake_png", "image/png")},
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert legacy_response.status_code == 404
 
 
 @patch("app.modules.auth.service.convert_image_to_webp")
@@ -673,13 +700,21 @@ def test_aut10_user_can_replace_own_image(
     mock_supabase.storage.from_().get_public_url.return_value = new_url
 
     response = client.patch(
-        f"/api/v1/users/{user_id}/image",
+        f"/api/v1/auth/{user_id}/image",
         files={"image": ("avatar.png", b"fake_png", "image/png")},
         headers={"Authorization": f"Bearer {token}"},
     )
 
     assert response.status_code == 200
     assert response.json()["image_url"] == new_url
+
+    legacy_response = client.patch(
+        f"/api/v1/users/{user_id}/image",
+        files={"image": ("avatar.png", b"fake_png", "image/png")},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert legacy_response.status_code == 404
 
 
 def test_aut10_rejects_other_user(auth_client) -> None:
@@ -714,7 +749,7 @@ def test_aut10_rejects_other_user(auth_client) -> None:
     user2_id = UUID(res2.json()["id_user"])
 
     response = client.patch(
-        f"/api/v1/users/{user2_id}/image",
+        f"/api/v1/auth/{user2_id}/image",
         files={"image": ("avatar.png", b"fake", "image/png")},
         headers={"Authorization": f"Bearer {token1}"},
     )
