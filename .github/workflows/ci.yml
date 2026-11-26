@@ -182,3 +182,72 @@ jobs:
           tags: marvel-${{ matrix.component }}:ci
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+  # ==========================================
+  # DOCKER - INTEGRATION TESTS
+  # ==========================================
+  docker-integration:
+    name: Docker - Integration Tests
+    runs-on: ubuntu-latest
+    needs:
+      - docker
+
+    env:
+      DATABASE_URL: postgresql+psycopg://marvel:marvel_ci_password@db:5432/marvel_ci?sslmode=disable
+      JWT_SECRET_KEY: ci-only-test-secret-not-for-production
+      CORS_ORIGINS: http://localhost:8080,http://localhost:8081
+      AUTH_COOKIE_SECURE: "false"
+      VITE_API_URL: ""
+      VITE_ADMIN_URL: http://localhost:8081
+      VITE_PUBLIC_URL: http://localhost:8080
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start application with Docker Compose
+        run: |
+          docker compose \
+            -f infra/docker-compose.yml \
+            -f infra/docker-compose.ci.yml \
+            up --build -d --wait --wait-timeout 180
+
+      - name: Test backend liveness
+        run: |
+          curl --fail --show-error http://localhost:8000/health
+
+      - name: Test backend readiness and database connection
+        run: |
+          curl --fail --show-error http://localhost:8000/ready
+          curl --fail --silent http://localhost:8000/ready | grep -q '"database":"connected"'
+
+      - name: Test public frontend
+        run: |
+          curl --fail --show-error http://localhost:8080/
+
+      - name: Test admin frontend
+        run: |
+          curl --fail --show-error http://localhost:8081/
+
+      - name: Display container status
+        if: always()
+        run: |
+          docker compose \
+            -f infra/docker-compose.yml \
+            -f infra/docker-compose.ci.yml \
+            ps
+
+      - name: Display logs on failure
+        if: failure()
+        run: |
+          docker compose \
+            -f infra/docker-compose.yml \
+            -f infra/docker-compose.ci.yml \
+            logs --no-color
+
+      - name: Stop containers and remove test volumes
+        if: always()
+        run: |
+          docker compose \
+            -f infra/docker-compose.yml \
+            -f infra/docker-compose.ci.yml \
+            down --volumes --remove-orphans
