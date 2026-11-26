@@ -276,7 +276,7 @@ def upload_user_image(
         raise UserNotFoundError(f"Utilisateur {id_user} introuvable.")
 
     if user.image_url:
-        raise ImageAlreadyExistsError("Une image existe déjà. Utilisez PATCH /users/{id}/image.")
+        raise ImageAlreadyExistsError("Une image existe déjà. Utilisez PATCH /auth/{id}/image.")
 
     url = _upload_user_image(id_user, image_bytes, replace=False)
     user.image_url = url

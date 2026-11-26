@@ -179,7 +179,7 @@ def assign_role(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@users_router.post("/{id_user}/image", response_model=UserOut)
+@router.post("/{id_user}/image", response_model=UserOut)
 async def aut09_upload_user_image(
     id_user: UUID,
     image: Annotated[UploadFile, File(..., description="Photo de profil")],
@@ -204,7 +204,7 @@ async def aut09_upload_user_image(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@users_router.patch("/{id_user}/image", response_model=UserOut)
+@router.patch("/{id_user}/image", response_model=UserOut)
 async def aut10_replace_user_image(
     id_user: UUID,
     image: Annotated[
