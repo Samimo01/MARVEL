@@ -1,10 +1,20 @@
-"""Accès à la base de données du module beneficiaries (requêtes SQLAlchemy uniquement)."""
+"""Accès aux données du module beneficiaries."""
 
-from sqlalchemy import case, or_, select
-from sqlalchemy.orm import Session
+from uuid import UUID
 
-from app.modules.auth.models import Role, RoleAssignment, User
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session, joinedload, selectinload
+
+from app.modules.auth.models import User
+from app.modules.beneficiaries.models import BeneficiaryFile, HelpRequest
 from app.modules.beneficiaries.schemas import BeneficiaryFileStatus
+from app.modules.distributions.models import Distribution, DistributionLine
+
+_DATABASE_STATUS = {
+    BeneficiaryFileStatus.ACTIVE: "activated",
+    BeneficiaryFileStatus.SUSPENDED: "Suspended",
+    BeneficiaryFileStatus.CLOSED: "Closed",
+}
 
 
 def list_beneficiary_files(
@@ -14,28 +24,12 @@ def list_beneficiary_files(
     status: BeneficiaryFileStatus | None,
     limit: int,
     offset: int,
-) -> list[tuple[User, str]]:
-    latest_assignment = (
-        select(RoleAssignment.assignment_type)
-        .join(Role, Role.id_role == RoleAssignment.id_role)
-        .where(
-            RoleAssignment.id_user == User.id_user,
-            Role.role_name == "Beneficiary",
-        )
-        .order_by(
-            RoleAssignment.created_at.desc(),
-            RoleAssignment.id_role_assignment.desc(),
-        )
-        .limit(1)
-        .correlate(User)
-        .scalar_subquery()
+) -> list[tuple[BeneficiaryFile, User | None]]:
+    statement = (
+        select(BeneficiaryFile, User)
+        .join(HelpRequest, HelpRequest.id_help_req == BeneficiaryFile.id_help_req)
+        .outerjoin(User, User.id_user == HelpRequest.id_user_request)
     )
-    file_status = case(
-        (latest_assignment == "revoked", BeneficiaryFileStatus.CLOSED.value),
-        (User.active.is_(False), BeneficiaryFileStatus.SUSPENDED.value),
-        else_=BeneficiaryFileStatus.ACTIVE.value,
-    )
-    statement = select(User, file_status.label("status")).where(latest_assignment.is_not(None))
 
     if search and search.strip():
         pattern = f"%{search.strip()}%"
@@ -51,7 +45,31 @@ def list_beneficiary_files(
         )
 
     if status is not None:
-        statement = statement.where(file_status == status.value)
+        statement = statement.where(BeneficiaryFile.status == _DATABASE_STATUS[status])
 
-    statement = statement.order_by(User.created_at.desc(), User.id_user).limit(limit).offset(offset)
-    return [(user, file_status) for user, file_status in session.execute(statement)]
+    statement = (
+        statement.order_by(
+            BeneficiaryFile.created_at.desc(),
+            BeneficiaryFile.id_ben_file,
+        )
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(session.execute(statement))
+
+
+def get_beneficiary_file(session: Session, id_ben_file: UUID) -> BeneficiaryFile | None:
+    statement = (
+        select(BeneficiaryFile)
+        .options(
+            selectinload(BeneficiaryFile.help_request).options(
+                selectinload(HelpRequest.supporting_documents),
+                joinedload(HelpRequest.requester),
+            ),
+            selectinload(BeneficiaryFile.distributions)
+            .selectinload(Distribution.lines)
+            .joinedload(DistributionLine.stock),
+        )
+        .where(BeneficiaryFile.id_ben_file == id_ben_file)
+    )
+    return session.scalar(statement)

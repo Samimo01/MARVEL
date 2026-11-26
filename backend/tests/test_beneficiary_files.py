@@ -1,9 +1,14 @@
 from datetime import UTC, datetime
+from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
 
 from app.modules.auth.models import Role, RoleAssignment, User
+from app.modules.beneficiaries.models import BeneficiaryFile, HelpRequest, SupportingDocument
+from app.modules.distributions.models import Distribution, DistributionLine
+from app.modules.stock.models import Stock
 from tests.auth_helpers import _assign_administrator_role, _register_test_user
 
 
@@ -24,69 +29,45 @@ def _assign_role(test_session, user_id, role_name: str, assignment_type: str = "
         session.commit()
 
 
+def _add_beneficiary_file(session, firstname, email, status, day):
+    beneficiary = User(
+        firstname=firstname,
+        lastname="Test",
+        email=email,
+        password_hash="not-used",
+    )
+    session.add(beneficiary)
+    session.flush()
+    request = HelpRequest(
+        nature_need="Aide alimentaire",
+        address="12 rue des Lilas",
+        request_at=datetime(2026, 1, day, tzinfo=UTC),
+        status="Accept",
+        id_user_request=beneficiary.id_user,
+    )
+    beneficiary_file = BeneficiaryFile(
+        status=status,
+        created_at=datetime(2026, 1, day, tzinfo=UTC),
+        help_request=request,
+    )
+    session.add_all([request, beneficiary_file])
+    session.flush()
+    return beneficiary, request, beneficiary_file
+
+
 def test_list_beneficiary_files_filters_search_status_and_pagination(auth_client) -> None:
     client, test_session = auth_client
     admin_id, admin_token = _register_test_user(client, "beneficiary-admin@example.com")
     _assign_administrator_role(test_session, admin_id)
 
     with test_session() as session:
-        beneficiary_role = Role(role_name="Beneficiary")
-        volunteer_role = Role(role_name="Volunteer")
-        session.add_all([beneficiary_role, volunteer_role])
-        session.flush()
-        records = [
-            User(
-                firstname=firstname,
-                lastname="Test",
-                email=f"{firstname.lower()}-beneficiary@example.com",
-                password_hash="not-used",
-                active=active,
-                created_at=datetime(2026, 1, day, tzinfo=UTC),
-            )
-            for firstname, active, day in (
-                ("Amina", True, 3),
-                ("Brahim", False, 2),
-                ("Chloé", True, 1),
-            )
-        ]
-        unrelated = User(
-            firstname="Non",
-            lastname="Beneficiary",
-            email="not-beneficiary@example.com",
-            password_hash="not-used",
-        )
-        session.add_all([*records, unrelated])
-        session.flush()
-        for index, record in enumerate(records):
-            session.add(
-                RoleAssignment(
-                    id_user=record.id_user,
-                    id_role=beneficiary_role.id_role,
-                    assignment_type="assigned",
-                    created_at=datetime(2026, 1, 1, tzinfo=UTC),
-                )
-            )
-            if index == 2:
-                session.add(
-                    RoleAssignment(
-                        id_user=record.id_user,
-                        id_role=beneficiary_role.id_role,
-                        assignment_type="revoked",
-                        created_at=datetime(2026, 1, 4, tzinfo=UTC),
-                    )
-                )
-        session.add(
-            RoleAssignment(
-                id_user=unrelated.id_user,
-                id_role=volunteer_role.id_role,
-                assignment_type="assigned",
-            )
-        )
+        _add_beneficiary_file(session, "Amina", "amina@example.com", "activated", 3)
+        _add_beneficiary_file(session, "Brahim", "brahim@example.com", "Suspended", 2)
+        _add_beneficiary_file(session, "Chloé", "chloe@example.com", "Closed", 1)
         session.commit()
 
     headers = {"Authorization": f"Bearer {admin_token}"}
     endpoint = "/api/v1/beneficiary-files"
-
     all_files = client.get(endpoint, headers=headers)
     active_files = client.get(f"{endpoint}?status=Actif", headers=headers)
     suspended_files = client.get(f"{endpoint}?status=Suspendu", headers=headers)
@@ -97,11 +78,88 @@ def test_list_beneficiary_files_filters_search_status_and_pagination(auth_client
     assert all_files.status_code == 200
     assert [item["firstname"] for item in all_files.json()] == ["Amina", "Brahim", "Chloé"]
     assert [item["status"] for item in all_files.json()] == ["Actif", "Suspendu", "Clôturé"]
+    assert all(item["id_ben_file"] for item in all_files.json())
     assert [item["firstname"] for item in active_files.json()] == ["Amina"]
     assert [item["firstname"] for item in suspended_files.json()] == ["Brahim"]
     assert [item["firstname"] for item in closed_files.json()] == ["Chloé"]
     assert [item["firstname"] for item in search.json()] == ["Brahim"]
     assert [item["firstname"] for item in page.json()] == ["Brahim"]
+
+
+def test_get_beneficiary_file_returns_request_and_confirmed_aid(auth_client) -> None:
+    client, test_session = auth_client
+    admin_id, admin_token = _register_test_user(client, "beneficiary-detail-admin@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    with test_session() as session:
+        beneficiary, request, beneficiary_file = _add_beneficiary_file(
+            session,
+            "Amina",
+            "amina-detail@example.com",
+            "activated",
+            3,
+        )
+        session.add(
+            SupportingDocument(
+                id_help_req=request.id_help_req,
+                document_url="https://example.com/proof.pdf",
+                title="Justificatif",
+            )
+        )
+        stock = Stock(title="Panier alimentaire", available_quantity=Decimal("10.00"))
+        confirmed_distribution = Distribution(
+            id_distrib=uuid4(),
+            id_ben_file=beneficiary_file.id_ben_file,
+            status="Delivered_confirmed",
+        )
+        planned_distribution = Distribution(
+            id_distrib=uuid4(),
+            id_ben_file=beneficiary_file.id_ben_file,
+            status="Planned",
+        )
+        session.add_all([stock, confirmed_distribution, planned_distribution])
+        session.flush()
+        session.add(
+            DistributionLine(
+                id_distrib=confirmed_distribution.id_distrib,
+                id_distrib_n=uuid4(),
+                id_stock=stock.id_stock,
+                quantity=Decimal("2.00"),
+            )
+        )
+        session.commit()
+        beneficiary_id = beneficiary.id_user
+        request_id = request.id_help_req
+        beneficiary_file_id = beneficiary_file.id_ben_file
+
+    response = client.get(
+        f"/api/v1/beneficiary-files/{beneficiary_file_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["id_ben_file"] == str(beneficiary_file_id)
+    assert result["beneficiary"]["id_user"] == str(beneficiary_id)
+    assert result["origin_request"]["id_help_req"] == str(request_id)
+    assert result["origin_request"]["status"] == "Accept"
+    assert result["origin_request"]["supporting_documents"][0]["title"] == "Justificatif"
+    assert len(result["received_aids"]) == 1
+    assert result["received_aids"][0]["status"] == "Delivered_confirmed"
+    assert result["received_aids"][0]["lines"][0]["stock_title"] == "Panier alimentaire"
+    assert result["received_aids"][0]["lines"][0]["quantity"] == "2.00"
+
+
+def test_get_unknown_beneficiary_file_returns_404(auth_client) -> None:
+    client, test_session = auth_client
+    admin_id, admin_token = _register_test_user(client, "beneficiary-missing-admin@example.com")
+    _assign_administrator_role(test_session, admin_id)
+
+    response = client.get(
+        f"/api/v1/beneficiary-files/{uuid4()}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == 404
 
 
 @pytest.mark.parametrize(
@@ -113,7 +171,7 @@ def test_list_beneficiary_files_filters_search_status_and_pagination(auth_client
         ("Treasurer", False),
     ],
 )
-def test_beneficiary_file_list_requires_an_allowed_role(
+def test_beneficiary_file_routes_require_an_allowed_role(
     auth_client, role_name: str, allowed: bool
 ) -> None:
     client, test_session = auth_client
@@ -127,5 +185,10 @@ def test_beneficiary_file_list_requires_an_allowed_role(
         "/api/v1/beneficiary-files",
         headers={"Authorization": f"Bearer {token}"},
     )
+    detail = client.get(
+        f"/api/v1/beneficiary-files/{uuid4()}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
 
     assert response.status_code == (200 if allowed else 403)
+    assert detail.status_code == (404 if allowed else 403)

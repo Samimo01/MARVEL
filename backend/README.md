@@ -118,13 +118,16 @@ Alembic (`alembic upgrade head`) afin de créer la table `refresh_tokens`.
 
 ## Modification du profil
 
-`GET /api/v1/beneficiary-files` liste les dossiers des utilisateurs ayant ou ayant eu
-le rôle `Beneficiary`. Les rôles `Collection_Manager`, `Stock_Manager` et `Administrator`
-peuvent consulter cette liste. Les paramètres `limit` (1–100, par défaut 50), `offset`
-(0 par défaut) et `search` (prénom, nom, nom complet, pseudonyme ou e-mail) permettent
-la pagination et la recherche. Le filtre `status` accepte `Actif`, `Suspendu` ou
-`Clôturé` : un rôle bénéficiaire actuellement attribué à un compte actif est actif;
-un compte désactivé est suspendu; un rôle bénéficiaire révoqué est clôturé.
+`GET /api/v1/beneficiary-files` liste les dossiers associés à une demande d'aide.
+Les rôles `Collection_Manager`, `Stock_Manager` et `Administrator` peuvent consulter
+cette liste. Les paramètres `limit` (1–100, par défaut 50), `offset` (0 par défaut)
+et `search` (prénom, nom complet, pseudonyme ou e-mail) permettent la pagination et
+la recherche. Le filtre `status` accepte `Actif`, `Suspendu` ou `Clôturé`, mappés aux
+valeurs de l'enum PostgreSQL `case_status` (`activated`, `Suspended`, `Closed`).
+
+`GET /api/v1/beneficiary-files/{id_ben_file}` renvoie le bénéficiaire, sa demande d'aide
+d'origine avec ses justificatifs et les aides dont la remise est confirmée, avec les
+articles et quantités distribués. Un dossier inexistant retourne `404`.
 
 `GET /api/v1/users` est réservé aux administrateurs et renvoie une liste paginée avec
 `limit` (1–100, par défaut 50) et `offset` (0 par défaut). Le paramètre `search` recherche

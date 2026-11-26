@@ -11,7 +11,9 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 from app.modules.auth.models import RefreshToken, RevokedToken, Role, RoleAssignment, User
+from app.modules.beneficiaries.models import BeneficiaryFile, HelpRequest, SupportingDocument
 from app.modules.campaigns.models import Campaign, Event
+from app.modules.distributions.models import Distribution, DistributionLine
 from app.modules.financial_donations.models import FinancialDon
 from app.modules.natural_donations.models import (
     Collect,
@@ -19,6 +21,7 @@ from app.modules.natural_donations.models import (
     NaturalDonItem,
     ObjectType,
 )
+from app.modules.stock.models import Stock
 from app.modules.treasury.models import Fund
 from app.modules.volunteers.models import Mission, SignIn
 
@@ -56,6 +59,12 @@ def auth_client(
         RoleAssignment.__table__,
         RevokedToken.__table__,
         RefreshToken.__table__,
+        BeneficiaryFile.__table__,
+        HelpRequest.__table__,
+        SupportingDocument.__table__,
+        Distribution.__table__,
+        DistributionLine.__table__,
+        Stock.__table__,
     ]
     Base.metadata.create_all(engine, tables=auth_tables)
     test_session = sessionmaker(bind=engine, autoflush=False)
