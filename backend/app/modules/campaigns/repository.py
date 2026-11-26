@@ -16,6 +16,16 @@ def get_campaign_by_id(session: Session, id_campaign: UUID) -> Campaign | None:
     return session.get(Campaign, id_campaign)
 
 
+def list_campaigns_by_user(session: Session, user_id: UUID) -> list[Campaign]:
+    return list(
+        session.scalars(
+            select(Campaign)
+            .where(Campaign.id_user == user_id)
+            .order_by(Campaign.created_at.desc())
+        ).all()
+    )
+
+
 def get_campaign_by_title(session: Session, title: str) -> Campaign | None:
     return session.scalar(select(Campaign).where(func.lower(Campaign.title) == title.lower()))
 

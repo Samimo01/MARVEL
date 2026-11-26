@@ -46,6 +46,15 @@ def list_all_funds(session: Session) -> list[Fund]:
     return list(session.scalars(statement).all())
 
 
+def list_funds_by_user(session: Session, user_id: UUID) -> list[Fund]:
+    statement = (
+        select(Fund)
+        .where(Fund.id_user == user_id)
+        .order_by(Fund.transaction_at.desc())
+    )
+    return list(session.scalars(statement).all())
+
+
 def list_expenses_by_event(
     session: Session,
     id_event: UUID,

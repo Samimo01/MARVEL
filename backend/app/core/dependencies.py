@@ -20,6 +20,16 @@ from app.modules.auth.models import User
 security = HTTPBearer(auto_error=False)
 
 
+def validate_cookie_origin(request: Request) -> None:
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        origin = request.headers.get("origin")
+        if origin not in settings.cors_origin_list:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Origine non autorisée pour une requête authentifiée.",
+            )
+
+
 def get_access_token(
     request: Request,
     credentials: Annotated[
@@ -37,13 +47,7 @@ def get_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if request.method not in {"GET", "HEAD", "OPTIONS"}:
-        origin = request.headers.get("origin")
-        if origin not in settings.cors_origin_list:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                "Origine non autorisée pour une requête authentifiée.",
-            )
+    validate_cookie_origin(request)
     return token
 
 
@@ -71,6 +75,8 @@ def get_current_user(
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Utilisateur introuvable")
+    if not user.active:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Compte désactivé")
     return user
 
 

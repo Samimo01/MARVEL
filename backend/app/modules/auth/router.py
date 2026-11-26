@@ -7,34 +7,58 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
+    Request,
     Response,
     UploadFile,
     status,
 )
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_access_token, get_current_user, require_administrator
+from app.core.dependencies import (
+    get_access_token,
+    get_current_user,
+    require_administrator,
+    validate_cookie_origin,
+)
 from app.database import get_db
 from app.modules.auth import service
-from app.modules.auth.cookies import clear_access_token_cookie, set_access_token_cookie
+from app.modules.auth.cookies import (
+    REFRESH_TOKEN_COOKIE,
+    clear_access_token_cookie,
+    clear_refresh_token_cookie,
+    set_access_token_cookie,
+    set_refresh_token_cookie,
+)
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
     AuthResponse,
     AuthSessionResponse,
     LoginRequest,
     LogoutResponse,
+    PasswordChangeRequest,
     RegistrationRequest,
     RegistrationResponse,
     RoleAssignmentRequest,
     RoleAssignmentResponse,
     RoleName,
+    RoleRevocationResponse,
+    UserActivationUpdate,
+    UserDetailOut,
     UserOut,
+    UserProfileUpdate,
 )
 from app.modules.auth.service import (
+    AdministratorActivationProhibitedError,
     CannotRevokeLastAdministratorError,
     DuplicateAccountError,
     ImageAlreadyExistsError,
+    IncorrectCurrentPasswordError,
     InvalidCredentialsError,
+    InvalidRefreshTokenError,
+    ManagedRoleAssignmentNotFoundError,
+    ManagedRoleNotFoundError,
     ManagedUserNotFoundError,
     UnauthorizedImageActionError,
     UserNotFoundError,
@@ -49,6 +73,25 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_administrator)]
 
 
+@users_router.get("", response_model=list[UserOut])
+def list_users(
+    db: DbSession,
+    admin: AdminUser,
+    search: Annotated[str | None, Query(max_length=100)] = None,
+    active: bool | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[UserOut]:
+    users = service.list_users(
+        db,
+        search=search,
+        active=active,
+        limit=limit,
+        offset=offset,
+    )
+    return [UserOut.model_validate(user) for user in users]
+
+
 @router.post("/login", response_model=AuthResponse)
 def login(
     payload: LoginRequest,
@@ -56,7 +99,7 @@ def login(
     db: DbSession,
 ) -> AuthResponse:
     try:
-        access_token = service.authenticate_user(db, payload)
+        tokens = service.authenticate_user(db, payload)
     except InvalidCredentialsError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -65,14 +108,59 @@ def login(
         ) from exc
     set_access_token_cookie(
         response,
-        access_token,
+        tokens.access_token,
         persistent=payload.remember_me,
+    )
+    set_refresh_token_cookie(
+        response,
+        tokens.refresh_token,
+        persistent=tokens.persistent,
     )
     return AuthResponse(message="Connexion réussie.")
 
 
+@router.post("/refresh", response_model=AuthResponse)
+def refresh(
+    request: Request,
+    response: Response,
+    db: DbSession,
+) -> AuthResponse | JSONResponse:
+    validate_cookie_origin(request)
+    token = request.cookies.get(REFRESH_TOKEN_COOKIE)
+    if not token:
+        return _invalid_refresh_response()
+
+    try:
+        tokens = service.rotate_refresh_token(db, token)
+    except InvalidRefreshTokenError:
+        return _invalid_refresh_response()
+
+    set_access_token_cookie(
+        response,
+        tokens.access_token,
+        persistent=tokens.persistent,
+    )
+    set_refresh_token_cookie(
+        response,
+        tokens.refresh_token,
+        persistent=tokens.persistent,
+    )
+    return AuthResponse(message="Session renouvelée.")
+
+
+def _invalid_refresh_response() -> JSONResponse:
+    response = JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={"detail": "Refresh token invalide ou expiré."},
+    )
+    clear_access_token_cookie(response)
+    clear_refresh_token_cookie(response)
+    return response
+
+
 @router.post("/logout", response_model=LogoutResponse)
 def logout(
+    request: Request,
     response: Response,
     token: Annotated[str, Depends(get_access_token)],
     db: DbSession,
@@ -83,7 +171,15 @@ def logout(
         token=token,
         user_id=current_user.id_user,
     )
+    refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE)
+    if refresh_token:
+        service.revoke_refresh_token(
+            db,
+            token=refresh_token,
+            user_id=current_user.id_user,
+        )
     clear_access_token_cookie(response)
+    clear_refresh_token_cookie(response)
     return LogoutResponse(message="Déconnexion réussie.")
 
 
@@ -97,6 +193,104 @@ def current_session(
         user=UserOut.model_validate(current_user),
         roles=service.list_active_user_roles(db, current_user.id_user),
     )
+
+
+@users_router.get("/{id_user}", response_model=UserDetailOut)
+def get_user_detail(
+    id_user: UUID,
+    db: DbSession,
+    admin: AdminUser,
+) -> UserDetailOut:
+    try:
+        return service.get_user_detail(db, id_user)
+    except ManagedUserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@users_router.patch("/{id_user}/activation", response_model=UserOut)
+def update_user_activation(
+    id_user: UUID,
+    payload: UserActivationUpdate,
+    db: DbSession,
+    admin: AdminUser,
+) -> UserOut:
+    try:
+        user = service.update_user_activation(db, id_user, payload.active)
+    except ManagedUserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except AdministratorActivationProhibitedError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return UserOut.model_validate(user)
+
+
+@users_router.delete(
+    "/{user_id}/roles/{role_id}",
+    response_model=RoleRevocationResponse,
+)
+def revoke_user_role(
+    user_id: UUID,
+    role_id: UUID,
+    db: DbSession,
+    admin: AdminUser,
+) -> RoleRevocationResponse:
+    try:
+        return service.revoke_user_role_assignment(
+            db,
+            user_id=user_id,
+            role_id=role_id,
+        )
+    except ManagedUserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ManagedRoleNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ManagedRoleAssignmentNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except CannotRevokeLastAdministratorError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+
+@users_router.patch("/me", response_model=UserOut)
+def update_current_user(
+    request: Request,
+    payload: UserProfileUpdate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> UserOut:
+    validate_cookie_origin(request)
+    try:
+        user = service.update_user_profile(
+            db,
+            user=current_user,
+            payload=payload,
+        )
+    except DuplicateAccountError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return UserOut.model_validate(user)
+
+
+@users_router.patch("/me/password", response_model=AuthResponse)
+def change_current_user_password(
+    request: Request,
+    payload: PasswordChangeRequest,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> AuthResponse:
+    validate_cookie_origin(request)
+    try:
+        service.change_user_password(
+            db,
+            user=current_user,
+            payload=payload,
+        )
+    except IncorrectCurrentPasswordError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return AuthResponse(message="Mot de passe modifié avec succès.")
 
 
 @router.post(
@@ -120,19 +314,52 @@ async def register(
             "Le fichier fourni n'est pas une image.",
         )
     try:
-        user, access_token = service.register_user(db, payload, image_bytes=image_bytes)
+        user, tokens = service.register_user(db, payload, image_bytes=image_bytes)
     except DuplicateAccountError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    except ImageAlreadyExistsError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
-    set_access_token_cookie(response, access_token, persistent=True)
+    set_access_token_cookie(response, tokens.access_token, persistent=tokens.persistent)
+    set_refresh_token_cookie(response, tokens.refresh_token, persistent=tokens.persistent)
     return RegistrationResponse(
         message="Compte créé.",
         id_user=user.id_user,
         nickname=user.nickname,
         image_url=user.image_url,
     )
+
+
+@router.post("/{id_user}/image", response_model=UserOut)
+async def aut09_upload_user_image(
+    id_user: UUID,
+    image: Annotated[
+        UploadFile,
+        File(..., description="Photo de profil"),
+    ],
+    db: DbSession,
+    current_user: CurrentUser,
+) -> UserOut:
+    """AUT-09 : Ajoute une première photo au compte."""
+    if not (image.content_type or "").startswith("image/"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
+
+    image_bytes = await image.read()
+    try:
+        user = service.upload_user_image(
+            db,
+            current_user=current_user,
+            id_user=id_user,
+            image_bytes=image_bytes,
+        )
+        return UserOut.model_validate(user)
+    except UserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ImageAlreadyExistsError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except UnauthorizedImageActionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
 
 
 @admin_router.get("/roles", response_model=list[RoleName])
@@ -179,32 +406,7 @@ def assign_role(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@router.post("/{id_user}/image", response_model=UserOut)
-async def aut09_upload_user_image(
-    id_user: UUID,
-    image: Annotated[UploadFile, File(..., description="Photo de profil")],
-    db: DbSession,
-) -> UserOut:
-    if not (image.content_type or "").startswith("image/"):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            "Le fichier fourni n'est pas une image.",
-        )
-    image_bytes = await image.read()
-    try:
-        user = service.upload_user_image(
-            db,
-            id_user=id_user,
-            image_bytes=image_bytes,
-        )
-        return UserOut.model_validate(user)
-    except UserNotFoundError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
-    except ImageAlreadyExistsError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-
-
-@router.patch("/{id_user}/image", response_model=UserOut)
+@users_router.patch("/{id_user}/image", response_model=UserOut)
 async def aut10_replace_user_image(
     id_user: UUID,
     image: Annotated[

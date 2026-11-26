@@ -13,6 +13,28 @@ export class ApiError extends Error {
   }
 }
 
+let refreshRequest: Promise<boolean> | null = null
+
+function refreshAccessToken(): Promise<boolean> {
+  if (!refreshRequest) {
+    const request = fetch(`${config.apiUrl}${API_PREFIX}/auth/refresh`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    })
+      .then((response) => response.ok)
+      .finally(() => {
+        refreshRequest = null
+      })
+    refreshRequest = request
+  }
+  return refreshRequest
+}
+
+function canRefreshForPath(path: string): boolean {
+  return !['/auth/login', '/auth/register', '/auth/refresh'].includes(path)
+}
+
 /**
  * Client API centralisé : c'est le SEUL endroit où l'on appelle `fetch`.
  * Les features l'utilisent via leur fichier `api.ts`.
@@ -21,11 +43,20 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
 
-  const response = await fetch(`${config.apiUrl}${API_PREFIX}${path}`, {
+  const url = `${config.apiUrl}${API_PREFIX}${path}`
+  const requestInit: RequestInit = {
     ...init,
     headers,
     credentials: 'include',
-  })
+  }
+  let response = await fetch(url, requestInit)
+  if (
+    response.status === 401 &&
+    canRefreshForPath(path) &&
+    (await refreshAccessToken())
+  ) {
+    response = await fetch(url, requestInit)
+  }
 
   if (!response.ok) {
     let message = `Erreur API (${response.status})`
