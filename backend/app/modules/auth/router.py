@@ -42,6 +42,7 @@ from app.modules.auth.schemas import (
     RoleAssignmentResponse,
     RoleName,
     UserOut,
+    UserProfileUpdate,
 )
 from app.modules.auth.service import (
     CannotRevokeLastAdministratorError,
@@ -164,6 +165,28 @@ def current_session(
         user=UserOut.model_validate(current_user),
         roles=service.list_active_user_roles(db, current_user.id_user),
     )
+
+
+@users_router.patch("/me", response_model=UserOut)
+def update_current_user(
+    request: Request,
+    payload: UserProfileUpdate,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> UserOut:
+    validate_cookie_origin(request)
+    try:
+        user = service.update_user_profile(
+            db,
+            user=current_user,
+            payload=payload,
+        )
+    except DuplicateAccountError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return UserOut.model_validate(user)
 
 
 @router.post(

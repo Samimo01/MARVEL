@@ -113,6 +113,17 @@ des cookies `HttpOnly`, `SameSite=Lax`.
 Pour la production, configurer `AUTH_COOKIE_SECURE=true` et exécuter les migrations
 Alembic (`alembic upgrade head`) afin de créer la table `refresh_tokens`.
 
+## Modification du profil
+
+`PATCH /api/v1/users/me` permet à l'utilisateur authentifié de modifier un ou plusieurs
+champs parmi `firstname`, `lastname`, `email` et `tel`. Le prénom et le nom doivent
+contenir entre 2 et 100 caractères; l'adresse email doit utiliser le domaine `gmail.com`
+ou `example.com`, est normalisée en minuscules et doit être unique; le téléphone, s'il est
+fourni, doit contenir 10 chiffres et commencer par `05`, `06` ou `07`. Le téléphone peut
+être envoyé à `null` pour être effacé. Une adresse déjà utilisée retourne `409 Conflict`;
+un corps vide ou invalide retourne `422`. La même restriction de domaine s'applique à
+l'inscription.
+
 ## Base de données (Alembic)
 
 ```powershell

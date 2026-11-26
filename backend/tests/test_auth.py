@@ -144,6 +144,42 @@ def test_registration_rejects_duplicate_email(auth_client) -> None:
         assert len(session.scalars(select(User)).all()) == 1
 
 
+@pytest.mark.parametrize("domain", ["gmail.com", "example.com"])
+def test_registration_accepts_allowed_email_domains(auth_client, domain: str) -> None:
+    client, _ = auth_client
+
+    response = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": f"ada@{domain}",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    assert response.status_code == 201
+
+
+@pytest.mark.parametrize("email", ["ada@outlook.com", "ada@mail.gmail.com"])
+def test_registration_rejects_other_email_domains(auth_client, email: str) -> None:
+    client, _ = auth_client
+
+    response = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": email,
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_login_returns_a_persistent_http_only_cookie_for_valid_credentials(auth_client) -> None:
     client, _ = auth_client
     registration = client.post(
@@ -397,6 +433,136 @@ def test_current_session_returns_only_active_roles(auth_client) -> None:
     assert response.status_code == 200
     assert response.json()["user"]["email"] == "volunteer@example.com"
     assert response.json()["roles"] == ["Volunteer"]
+
+
+def test_profile_update_changes_only_submitted_fields_and_normalizes_email(auth_client) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "profile@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.patch(
+        "/api/v1/users/me",
+        json={
+            "firstname": " Grace ",
+            "email": " Grace@Example.com ",
+            "tel": "0712345678",
+        },
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["firstname"] == "Grace"
+    assert response.json()["lastname"] == "Lovelace"
+    assert response.json()["email"] == "grace@example.com"
+    assert response.json()["tel"] == "0712345678"
+
+    cleared_phone = client.patch(
+        "/api/v1/users/me",
+        json={"tel": None},
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert cleared_phone.status_code == 200
+    assert cleared_phone.json()["tel"] is None
+
+
+def test_profile_update_rejects_duplicate_email(auth_client) -> None:
+    client, test_session = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "first@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+    second_user = client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Grace",
+            "lastname": "Hopper",
+            "email": "second@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0712345678",
+        },
+    )
+
+    response = client.patch(
+        "/api/v1/users/me",
+        json={"email": "FIRST@example.com"},
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Un compte utilise déjà cette adresse e-mail."
+    with test_session() as session:
+        user = session.get(User, UUID(second_user.json()["id_user"]))
+        assert user is not None
+        assert user.email == "second@example.com"
+
+
+def test_profile_update_requires_a_trusted_origin(auth_client) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "profile-origin@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.patch(
+        "/api/v1/users/me",
+        json={"firstname": "Grace"},
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"firstname": "A"},
+        {"lastname": None},
+        {"email": "adresse-invalide"},
+        {"email": "profile@outlook.com"},
+        {"tel": "1234567890"},
+    ],
+)
+def test_profile_update_rejects_invalid_fields(auth_client, payload) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "profile-validation@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.patch(
+        "/api/v1/users/me",
+        json=payload,
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert response.status_code == 422
 
 
 def test_cookie_logout_requires_a_trusted_origin_and_clears_the_cookie(auth_client) -> None:

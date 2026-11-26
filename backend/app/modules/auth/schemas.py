@@ -3,9 +3,24 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, SecretStr, field_validator
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 
 PHONE_RE = re.compile(r"^0[567]\d{8}$")
+ALLOWED_EMAIL_DOMAINS = frozenset({"gmail.com", "example.com"})
+
+
+def validate_email_domain(value: EmailStr) -> EmailStr:
+    domain = str(value).rsplit("@", maxsplit=1)[-1].lower()
+    if domain not in ALLOWED_EMAIL_DOMAINS:
+        raise ValueError("L'adresse email doit utiliser @gmail.com ou @example.com.")
+    return value
 
 
 class RegistrationRequest(BaseModel):
@@ -14,6 +29,11 @@ class RegistrationRequest(BaseModel):
     email: EmailStr
     password: SecretStr = Field(min_length=8, max_length=128)
     tel: str = Field(min_length=10, max_length=10)
+
+    @field_validator("email")
+    @classmethod
+    def require_allowed_email_domain(cls, value: EmailStr) -> EmailStr:
+        return validate_email_domain(value)
 
     @field_validator("firstname", "lastname")
     @classmethod
@@ -49,6 +69,53 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: SecretStr = Field(min_length=1)
     remember_me: bool = False
+
+
+class UserProfileUpdate(BaseModel):
+    firstname: str | None = Field(default=None, min_length=2, max_length=100)
+    lastname: str | None = Field(default=None, min_length=2, max_length=100)
+    email: EmailStr | None = None
+    tel: str | None = Field(default=None, min_length=10, max_length=10)
+
+    @field_validator("firstname", "lastname")
+    @classmethod
+    def normalize_profile_name(cls, value: str | None) -> str:
+        if value is None:
+            raise ValueError("Ce champ ne peut pas être vide.")
+        value = value.strip()
+        if not 2 <= len(value) <= 100:
+            raise ValueError("Ce champ doit contenir entre 2 et 100 caractères.")
+        return value
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_profile_email(cls, value: str | None) -> str:
+        if value is None:
+            raise ValueError("L'adresse email ne peut pas être vide.")
+        return str(value).strip().lower()
+
+    @field_validator("email")
+    @classmethod
+    def require_allowed_email_domain(cls, value: EmailStr) -> EmailStr:
+        return validate_email_domain(value)
+
+    @field_validator("tel")
+    @classmethod
+    def validate_profile_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not PHONE_RE.fullmatch(value):
+            raise ValueError(
+                "Le téléphone doit commencer par 05, 06 ou 07 et contenir 10 chiffres."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def require_at_least_one_change(self) -> "UserProfileUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Au moins un champ doit être renseigné.")
+        return self
 
 
 class LogoutResponse(BaseModel):

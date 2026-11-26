@@ -27,6 +27,7 @@ from app.modules.auth.schemas import (
     RoleAssignmentResponse,
     RoleAssignmentStatus,
     RoleName,
+    UserProfileUpdate,
 )
 
 
@@ -257,6 +258,34 @@ def register_user(
     except DuplicateAccountError:
         session.rollback()
         raise
+
+
+def update_user_profile(
+    session: Session,
+    *,
+    user: User,
+    payload: UserProfileUpdate,
+) -> User:
+    changes = payload.model_dump(exclude_unset=True)
+    if "email" in changes:
+        email = str(changes["email"]).strip().lower()
+        existing_user = repository.get_user_by_email(session, email)
+        if existing_user is not None and existing_user.id_user != user.id_user:
+            raise DuplicateAccountError("Un compte utilise déjà cette adresse e-mail.")
+        changes["email"] = email
+
+    for field, value in changes.items():
+        setattr(user, field, value)
+    user.updated_at = datetime.now(UTC)
+
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise DuplicateAccountError("Un compte utilise déjà cette adresse e-mail.") from exc
+
+    session.refresh(user)
+    return user
 
 
 def list_user_role_assignments(session: Session, user_id: UUID) -> list[RoleAssignmentResponse]:
