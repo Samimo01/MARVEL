@@ -21,7 +21,7 @@ export function PageBreadcrumb({ pageTitle }: BreadcrumbProps) {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink to="/">Home</BreadcrumbLink>
+            <BreadcrumbLink to="/">Accueil</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
