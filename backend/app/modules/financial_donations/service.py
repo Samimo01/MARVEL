@@ -3,11 +3,22 @@
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
+from io import BytesIO
 from uuid import UUID
 
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import cm
+from reportlab.platypus import (
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 from sqlalchemy.orm import Session
-from pathlib import Path
-from io import BytesIO
+
 from app.modules.auth import repository as auth_repo
 from app.modules.auth.models import User
 from app.modules.campaigns import repository as campaign_repo
@@ -19,13 +30,7 @@ from app.modules.financial_donations.schemas import (
     PaymentInitOut,
     PaymentStatusOut,
 )
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import cm
-from reportlab.platypus import (
-    Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
-)
+
 
 class DonationNotFoundError(Exception):
     pass
@@ -206,7 +211,6 @@ def generate_receipt_pdf(data: dict) -> bytes:
     GREEN = colors.HexColor("#15803D")
     LIGHT_BLUE = colors.HexColor("#EAF0F7")
     DARK_GREY = colors.HexColor("#475569")
-    WHITE = colors.white
 
     # Document (portrait pour un reçu)
     doc = SimpleDocTemplate(

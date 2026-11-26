@@ -13,6 +13,7 @@ from app.core.dependencies import (
     require_natural_donation_staff,
     require_stock_manager_or_admin,
 )
+from app.core.image_utils import InvalidImageError
 from app.database import get_db
 from app.modules.auth.models import User
 from app.modules.natural_donations import service as don_service
@@ -36,7 +37,7 @@ from app.modules.natural_donations.service import (
     NaturalDonNotFoundError,
     ObjectTypeNotFoundError,
 )
-from app.core.image_utils import InvalidImageError
+
 router = APIRouter(prefix="", tags=["Natural Donations"])
 admin_router = APIRouter(prefix="/admin", tags=["Admin - Object Types"])
 
