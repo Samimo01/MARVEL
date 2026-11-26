@@ -435,6 +435,61 @@ def test_current_session_returns_only_active_roles(auth_client) -> None:
     assert response.json()["roles"] == ["Volunteer"]
 
 
+def test_admin_can_search_filter_and_paginate_users(auth_client) -> None:
+    client, test_session = auth_client
+    admin_id, admin_token = _register_test_user(client, "admin-list@example.com")
+    active_id, _ = _register_test_user(client, "nadia@example.com")
+    inactive_id, _ = _register_test_user(client, "omar@gmail.com")
+    _assign_administrator_role(test_session, admin_id)
+
+    with test_session() as session:
+        active_user = session.get(User, active_id)
+        inactive_user = session.get(User, inactive_id)
+        assert active_user is not None
+        assert inactive_user is not None
+        active_user.firstname = "Nadia"
+        active_user.lastname = "Bousamedi"
+        inactive_user.firstname = "Omar"
+        inactive_user.lastname = "Khalil"
+        inactive_user.active = False
+        session.commit()
+
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    by_name = client.get(
+        "/api/v1/users?search=Nadia%20Bousamedi&active=true",
+        headers=headers,
+    )
+    by_email_and_state = client.get(
+        "/api/v1/users?search=omar@gmail.com&active=false",
+        headers=headers,
+    )
+    first_page = client.get("/api/v1/users?limit=1&offset=0", headers=headers)
+    second_page = client.get("/api/v1/users?limit=1&offset=1", headers=headers)
+
+    assert by_name.status_code == 200
+    assert [user["id_user"] for user in by_name.json()] == [str(active_id)]
+    assert by_email_and_state.status_code == 200
+    assert [user["id_user"] for user in by_email_and_state.json()] == [str(inactive_id)]
+    assert first_page.status_code == 200
+    assert second_page.status_code == 200
+    assert len(first_page.json()) == 1
+    assert len(second_page.json()) == 1
+    assert first_page.json()[0]["id_user"] != second_page.json()[0]["id_user"]
+    assert "password_hash" not in first_page.json()[0]
+
+
+def test_user_list_requires_administrator(auth_client) -> None:
+    client, _ = auth_client
+    _, token = _register_test_user(client, "regular-user@example.com")
+
+    response = client.get(
+        "/api/v1/users",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_profile_update_changes_only_submitted_fields_and_normalizes_email(auth_client) -> None:
     client, _ = auth_client
     client.post(

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
@@ -12,6 +12,33 @@ def get_user_by_email(session: Session, email: str) -> User | None:
 
 def get_user_by_id(session: Session, id_user: UUID) -> User | None:
     return session.get(User, id_user)
+
+
+def list_users(
+    session: Session,
+    *,
+    search: str | None,
+    active: bool | None,
+    limit: int,
+    offset: int,
+) -> list[User]:
+    statement = select(User)
+    if search:
+        pattern = f"%{search.strip()}%"
+        full_name = User.firstname + " " + User.lastname
+        statement = statement.where(
+            or_(
+                User.firstname.ilike(pattern),
+                User.lastname.ilike(pattern),
+                full_name.ilike(pattern),
+                User.email.ilike(pattern),
+            )
+        )
+    if active is not None:
+        statement = statement.where(User.active.is_(active))
+
+    statement = statement.order_by(User.created_at.desc(), User.id_user).limit(limit).offset(offset)
+    return list(session.scalars(statement).all())
 
 
 def is_token_revoked(session: Session, token_id: str) -> bool:

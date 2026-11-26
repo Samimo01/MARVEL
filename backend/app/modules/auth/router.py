@@ -7,6 +7,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -64,6 +65,25 @@ users_router = APIRouter(prefix="/users", tags=["users"])
 DbSession = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_administrator)]
+
+
+@users_router.get("", response_model=list[UserOut])
+def list_users(
+    db: DbSession,
+    admin: AdminUser,
+    search: Annotated[str | None, Query(max_length=100)] = None,
+    active: bool | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[UserOut]:
+    users = service.list_users(
+        db,
+        search=search,
+        active=active,
+        limit=limit,
+        offset=offset,
+    )
+    return [UserOut.model_validate(user) for user in users]
 
 
 @router.post("/login", response_model=AuthResponse)

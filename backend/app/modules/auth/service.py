@@ -293,6 +293,23 @@ def update_user_profile(
     return user
 
 
+def list_users(
+    session: Session,
+    *,
+    search: str | None,
+    active: bool | None,
+    limit: int,
+    offset: int,
+) -> list[User]:
+    return repository.list_users(
+        session,
+        search=search.strip() if search and search.strip() else None,
+        active=active,
+        limit=limit,
+        offset=offset,
+    )
+
+
 def change_user_password(
     session: Session,
     *,

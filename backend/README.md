@@ -115,6 +115,11 @@ Alembic (`alembic upgrade head`) afin de créer la table `refresh_tokens`.
 
 ## Modification du profil
 
+`GET /api/v1/users` est réservé aux administrateurs et renvoie une liste paginée avec
+`limit` (1–100, par défaut 50) et `offset` (0 par défaut). Le paramètre `search` recherche
+sans distinction de casse dans le prénom, le nom complet, le nom ou l'email; `active`
+filtre les comptes actifs (`true`) ou inactifs (`false`).
+
 `PATCH /api/v1/users/me` permet à l'utilisateur authentifié de modifier un ou plusieurs
 champs parmi `firstname`, `lastname`, `email` et `tel`. Le prénom et le nom doivent
 contenir entre 2 et 100 caractères; l'adresse email doit utiliser le domaine `gmail.com`
