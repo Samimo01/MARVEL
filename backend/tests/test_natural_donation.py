@@ -377,6 +377,106 @@ def test_nat10_and_nat11_reception_and_stock_in(natural_client) -> None:
     assert len(items) >= 1
 
 
+def test_stk01_lists_stock_items_with_filters_and_role_access(natural_client) -> None:
+    client, test_session = natural_client
+    admin_id, admin_token = _register_test_user(client, "stk01_admin@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    rice_type_id = _create_test_object_type(client, admin_headers, "Riz")
+    clothes_type_id = _create_test_object_type(client, admin_headers, "Vêtements")
+    donation_ids = []
+    for object_type_id, description in (
+        (rice_type_id, "Sac de céréales"),
+        (clothes_type_id, "Manteau"),
+        (rice_type_id, "Riz déclaré mais non stocké"),
+    ):
+        response = client.post(
+            "/api/v1/donations/natural",
+            json={
+                "recovery_mode": "Deposit",
+                "items": [
+                    {
+                        "id_object": object_type_id,
+                        "declared_quantity": 5,
+                        "declared_state": "Good",
+                        "description": description,
+                    }
+                ],
+            },
+            headers=admin_headers,
+        )
+        assert response.status_code == 201
+        data = response.json()
+        donation_ids.append((UUID(data["id_don_n"]), UUID(data["items"][0]["id_nat"])))
+
+    with test_session() as session:
+        for id_don_n, id_nat in donation_ids[:2]:
+            don = session.get(NaturalDon, id_don_n)
+            don.status = "In_Stock"
+            item = session.get(NaturalDonItem, (id_don_n, id_nat))
+            item.id_stock = uuid4()
+            item.is_compliant = True
+            item.received_quantity = 3
+            item.received_state = "Good"
+        session.commit()
+
+    manager_id, manager_token = _register_test_user(client, "stk01_manager@example.com")
+    volunteer_id, volunteer_token = _register_test_user(client, "stk01_volunteer@example.com")
+    with test_session() as session:
+        stock_role = Role(role_name="Stock_Manager")
+        volunteer_role = Role(role_name="Volunteer")
+        session.add_all([stock_role, volunteer_role])
+        session.flush()
+        session.add_all(
+            [
+                RoleAssignment(
+                    id_user=manager_id,
+                    id_role=stock_role.id_role,
+                    assignment_type="assigned",
+                ),
+                RoleAssignment(
+                    id_user=volunteer_id,
+                    id_role=volunteer_role.id_role,
+                    assignment_type="assigned",
+                ),
+            ]
+        )
+        session.commit()
+
+    manager_headers = {"Authorization": f"Bearer {manager_token}"}
+    volunteer_headers = {"Authorization": f"Bearer {volunteer_token}"}
+
+    listed = client.get("/api/v1/stocks", headers=admin_headers)
+    by_type = client.get(
+        f"/api/v1/stocks?object_type_id={rice_type_id}",
+        headers=admin_headers,
+    )
+    by_category = client.get(
+        "/api/v1/stocks?category=Vêtements",
+        headers=admin_headers,
+    )
+    by_search = client.get("/api/v1/stocks?search=céréales", headers=admin_headers)
+
+    assert listed.status_code == 200
+    assert len(listed.json()) == 2
+    assert {item["object_type"] for item in listed.json()} == {"Riz", "Vêtements"}
+    assert len(by_type.json()) == 1
+    assert len(by_category.json()) == 1
+    assert by_category.json()[0]["category"] == "Vêtements"
+    assert len(by_search.json()) == 1
+    assert by_search.json()[0]["received_quantity"] == "3.00"
+    assert client.get("/api/v1/stocks", headers=manager_headers).status_code == 200
+    assert client.get("/api/v1/stocks", headers=volunteer_headers).status_code == 403
+    assert (
+        client.get(
+            "/api/v1/stocks",
+            headers={"Authorization": "Bearer invalid"},
+        ).status_code
+        == 401
+    )
+
+
 # ============================================================
 # TESTS IMAGES (NAT-03 et NAT-19)
 # ============================================================
