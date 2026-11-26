@@ -55,10 +55,3 @@ class PaymentStatusOut(BaseModel):
     reference_payment: str | None
     paid_at: datetime | None = None
 
-
-class ReceiptOut(BaseModel):
-    """DON-06 : Réponse de génération de reçu."""
-
-    id_don_f: UUID
-    receipt_url: str
-    message: str
