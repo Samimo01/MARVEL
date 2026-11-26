@@ -57,4 +57,7 @@ class FinancialDon(Base):
     id_campaign: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("campaigns.id_campaign", ondelete="CASCADE"), nullable=False
     )
-    id_ben_file: Mapped[str | None] = mapped_column(String)  # TEXT dans le script SQL
+    id_ben_file: Mapped[UUID | None] = mapped_column(
+    Uuid(as_uuid=True),
+    nullable=True,
+    )

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_campaign_editor
@@ -16,7 +16,6 @@ from app.modules.financial_donations.schemas import (
     FinancialDonOut,
     PaymentInitOut,
     PaymentStatusOut,
-    ReceiptOut,
 )
 from app.modules.financial_donations.service import (
     CampaignNotFoundError,
@@ -150,16 +149,39 @@ def don05_get_donation_detail(
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
 
-@router.post("/{id_don_f}/receipt", response_model=ReceiptOut)
-def don06_generate_receipt(
+# ============================================================
+# DON-06 — GET unique : génère et renvoie le PDF en mémoire
+# ============================================================
+@router.get(
+    "/{id_don_f}/receipt",
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def don06_download_receipt(
     id_don_f: UUID,
     session: DbSession,
-    user: CampaignEditor,
+    user: CurrentUser,
 ):
-    """DON-06 : Générer le reçu d'un don."""
+    """
+    DON-06 : Télécharge le reçu PDF (généré à la volée, en mémoire).
+
+    - Aucun fichier n'est stocké sur le disque.
+    - Le don doit être au statut 'Success'.
+    - Accessible à tout utilisateur authentifié (donateur ou admin).
+    """
     try:
-        return don_service.generate_receipt(session, id_don_f)
+        pdf_bytes, filename = don_service.build_receipt(session, id_don_f)
     except DonationNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except DonationNotSuccessfulError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
