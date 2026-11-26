@@ -43,6 +43,7 @@ from app.modules.auth.schemas import (
     RoleAssignmentRequest,
     RoleAssignmentResponse,
     RoleName,
+    RoleRevocationResponse,
     UserActivationUpdate,
     UserDetailOut,
     UserOut,
@@ -56,6 +57,8 @@ from app.modules.auth.service import (
     IncorrectCurrentPasswordError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
+    ManagedRoleAssignmentNotFoundError,
+    ManagedRoleNotFoundError,
     ManagedUserNotFoundError,
     UnauthorizedImageActionError,
     UserNotFoundError,
@@ -218,6 +221,32 @@ def update_user_activation(
     except AdministratorActivationProhibitedError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     return UserOut.model_validate(user)
+
+
+@users_router.delete(
+    "/{user_id}/roles/{role_id}",
+    response_model=RoleRevocationResponse,
+)
+def revoke_user_role(
+    user_id: UUID,
+    role_id: UUID,
+    db: DbSession,
+    admin: AdminUser,
+) -> RoleRevocationResponse:
+    try:
+        return service.revoke_user_role_assignment(
+            db,
+            user_id=user_id,
+            role_id=role_id,
+        )
+    except ManagedUserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ManagedRoleNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ManagedRoleAssignmentNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except CannotRevokeLastAdministratorError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @users_router.patch("/me", response_model=UserOut)

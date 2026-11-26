@@ -87,7 +87,10 @@ disponibles avec `GET /api/v1/admin/roles`, voir les affectations d'un utilisate
 `GET /api/v1/admin/users/{id_user}/roles` et modifier une affectation avec
 `POST /api/v1/admin/users/{id_user}/roles/{role_name}`, en envoyant
 `{"assignment_type":"assigned"}` ou `{"assignment_type":"revoked"}`. Ces routes exigent
-un JWT d'administrateur. Le dernier administrateur actif ne peut pas se révoquer.
+un JWT d'administrateur. `DELETE /api/v1/users/{user_id}/roles/{role_id}` révoque un rôle
+par son identifiant de catalogue : l'opération ajoute une ligne `revoked` dans
+`role_assignments`, avec l'utilisateur, le rôle et la date dans `created_at`; l'historique
+existant n'est pas supprimé. Le dernier administrateur actif ne peut pas se révoquer.
 La création ne dépend pas de la configuration d'un service d'e-mail.
 La création, la modification, la publication, la clôture et la suppression d'une campagne
 requièrent un rôle actif `Collection_Manager` ou `Administrator` dans `role_assignments`.

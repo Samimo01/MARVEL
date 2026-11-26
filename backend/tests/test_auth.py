@@ -1074,6 +1074,56 @@ def test_administrator_can_assign_revoke_and_list_user_roles(auth_client) -> Non
         assert exc_info.value.status_code == 403
 
 
+def test_administrator_removes_role_by_catalog_id_and_preserves_history(auth_client) -> None:
+    client, test_session = auth_client
+    admin_id, admin_token = _register_test_user(client, "role-delete-admin@example.com")
+    target_id, _ = _register_test_user(client, "role-delete-target@example.com")
+    _, non_admin_token = _register_test_user(client, "role-delete-non-admin@example.com")
+    _assign_administrator_role(test_session, admin_id)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    assigned = client.post(
+        f"/api/v1/admin/users/{target_id}/roles/Volunteer",
+        headers=admin_headers,
+        json={"assignment_type": "assigned"},
+    )
+    assert assigned.status_code == 200
+    role_id = assigned.json()["id_role"]
+    endpoint = f"/api/v1/users/{target_id}/roles/{role_id}"
+
+    revoked = client.delete(endpoint, headers=admin_headers)
+    repeated_revocation = client.delete(endpoint, headers=admin_headers)
+
+    assert revoked.status_code == 200
+    assert revoked.json()["id_user"] == str(target_id)
+    assert revoked.json()["id_role"] == role_id
+    assert revoked.json()["assignment_type"] == "revoked"
+    assert revoked.json()["created_at"]
+    assert repeated_revocation.status_code == 200
+    assert repeated_revocation.json()["id_role_assignment"] == revoked.json()[
+        "id_role_assignment"
+    ]
+    forbidden = client.delete(
+        endpoint,
+        headers={"Authorization": f"Bearer {non_admin_token}"},
+    )
+    assert forbidden.status_code == 403
+
+    with test_session() as session:
+        history = session.scalars(
+            select(RoleAssignment)
+            .where(
+                RoleAssignment.id_user == target_id,
+                RoleAssignment.id_role == UUID(role_id),
+            )
+        ).all()
+        assert len(history) == 2
+        assert {assignment.assignment_type for assignment in history} == {
+            "assigned",
+            "revoked",
+        }
+
+
 def test_non_administrator_cannot_assign_roles(auth_client) -> None:
     client, _ = auth_client
     _, token = _register_test_user(client, "user@example.com")
@@ -1091,14 +1141,23 @@ def test_administrator_cannot_revoke_the_last_administrator(auth_client) -> None
     client, test_session = auth_client
     admin_id, token = _register_test_user(client, "only-admin@example.com")
     _assign_administrator_role(test_session, admin_id)
+    with test_session() as session:
+        administrator_role = session.scalar(
+            select(Role).where(Role.role_name == "Administrator")
+        )
 
     response = client.post(
         f"/api/v1/admin/users/{admin_id}/roles/Administrator",
         headers={"Authorization": f"Bearer {token}"},
         json={"assignment_type": "revoked"},
     )
+    delete_response = client.delete(
+        f"/api/v1/users/{admin_id}/roles/{administrator_role.id_role}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
 
     assert response.status_code == 409
+    assert delete_response.status_code == 409
 
 
 def test_administrator_can_toggle_non_admin_accounts_only(auth_client) -> None:

@@ -193,6 +193,15 @@ class RoleAssignmentResponse(BaseModel):
     created_at: datetime
 
 
+class RoleRevocationResponse(BaseModel):
+    id_role_assignment: UUID
+    id_user: UUID
+    id_role: UUID
+    role_name: str
+    assignment_type: RoleAssignmentStatus
+    created_at: datetime
+
+
 class UserDetailOut(UserOut):
     is_email_enable: bool
     locked_until: datetime | None

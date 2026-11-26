@@ -28,6 +28,7 @@ from app.modules.auth.schemas import (
     RoleAssignmentResponse,
     RoleAssignmentStatus,
     RoleName,
+    RoleRevocationResponse,
     UserDetailOut,
     UserOut,
     UserProfileUpdate,
@@ -71,6 +72,14 @@ class CannotRevokeLastAdministratorError(ValueError):
 
 
 class AdministratorActivationProhibitedError(ValueError):
+    pass
+
+
+class ManagedRoleNotFoundError(LookupError):
+    pass
+
+
+class ManagedRoleAssignmentNotFoundError(LookupError):
     pass
 
 
@@ -501,6 +510,66 @@ def set_user_role_assignment(
         role_name=role_name,
         assignment_type=payload.assignment_type,
         created_at=assignment.created_at,
+    )
+
+
+def revoke_user_role_assignment(
+    session: Session,
+    *,
+    user_id: UUID,
+    role_id: UUID,
+) -> RoleRevocationResponse:
+    if repository.get_user_by_id(session, user_id) is None:
+        raise ManagedUserNotFoundError(f"Utilisateur {user_id} introuvable.")
+
+    role = session.get(Role, role_id)
+    if role is None:
+        raise ManagedRoleNotFoundError(f"Rôle {role_id} introuvable.")
+
+    latest_assignment = repository.get_latest_role_assignment(
+        session,
+        user_id,
+        role.role_name,
+    )
+    if latest_assignment is None:
+        raise ManagedRoleAssignmentNotFoundError(
+            "Aucune attribution de ce rôle n'existe pour cet utilisateur."
+        )
+
+    if latest_assignment.assignment_type == RoleAssignmentStatus.REVOKED.value:
+        return RoleRevocationResponse(
+            id_role_assignment=latest_assignment.id_role_assignment,
+            id_user=latest_assignment.id_user,
+            id_role=latest_assignment.id_role,
+            role_name=role.role_name,
+            assignment_type=RoleAssignmentStatus.REVOKED,
+            created_at=latest_assignment.created_at,
+        )
+
+    if (
+        role.role_name == RoleName.ADMINISTRATOR.value
+        and _count_active_administrators(session, role.id_role) <= 1
+    ):
+        raise CannotRevokeLastAdministratorError(
+            "Impossible de révoquer le dernier rôle Administrator actif."
+        )
+
+    revocation = RoleAssignment(
+        id_user=user_id,
+        id_role=role_id,
+        assignment_type=RoleAssignmentStatus.REVOKED.value,
+        created_at=datetime.now(UTC),
+    )
+    session.add(revocation)
+    session.commit()
+    session.refresh(revocation)
+    return RoleRevocationResponse(
+        id_role_assignment=revocation.id_role_assignment,
+        id_user=revocation.id_user,
+        id_role=revocation.id_role,
+        role_name=role.role_name,
+        assignment_type=RoleAssignmentStatus.REVOKED,
+        created_at=revocation.created_at,
     )
 
 
