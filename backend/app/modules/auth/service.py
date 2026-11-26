@@ -28,8 +28,15 @@ from app.modules.auth.schemas import (
     RoleAssignmentResponse,
     RoleAssignmentStatus,
     RoleName,
+    UserDetailOut,
+    UserOut,
     UserProfileUpdate,
 )
+from app.modules.campaigns import repository as campaign_repository
+from app.modules.financial_donations import repository as financial_donation_repository
+from app.modules.natural_donations import repository as natural_donation_repository
+from app.modules.treasury import repository as treasury_repository
+from app.modules.volunteers import service as volunteer_service
 
 
 class DuplicateAccountError(ValueError):
@@ -307,6 +314,47 @@ def list_users(
         active=active,
         limit=limit,
         offset=offset,
+    )
+
+
+def get_user_detail(session: Session, user_id: UUID) -> UserDetailOut:
+    user = repository.get_user_by_id(session, user_id)
+    if user is None:
+        raise ManagedUserNotFoundError(f"Utilisateur {user_id} introuvable.")
+
+    role_assignments = [
+        RoleAssignmentResponse(
+            id_role_assignment=assignment.id_role_assignment,
+            id_user=assignment.id_user,
+            id_role=assignment.id_role,
+            role_name=RoleName(role_name),
+            assignment_type=RoleAssignmentStatus(assignment.assignment_type),
+            created_at=assignment.created_at,
+        )
+        for assignment, role_name in repository.list_role_assignments_for_user(
+            session,
+            user_id,
+        )
+    ]
+
+    return UserDetailOut(
+        **UserOut.model_validate(user).model_dump(),
+        is_email_enable=user.is_email_enable,
+        locked_until=user.locked_until,
+        updated_at=user.updated_at,
+        role_assignments=role_assignments,
+        campaigns=campaign_repository.list_campaigns_by_user(session, user_id),
+        mission_sign_ins=volunteer_service.get_my_sign_ins(session, user_id),
+        financial_donations=financial_donation_repository.list_user_donations(
+            session,
+            user_id,
+        ),
+        natural_donations=natural_donation_repository.list_natural_dons_related_to_user(
+            session,
+            user_id,
+        ),
+        collections=natural_donation_repository.list_collects_by_user(session, user_id),
+        treasury_operations=treasury_repository.list_funds_by_user(session, user_id),
     )
 
 

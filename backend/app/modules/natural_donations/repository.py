@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.modules.natural_donations.models import (
@@ -55,6 +55,32 @@ def list_natural_dons(session: Session, status: str | None = None) -> list[Natur
     stmt = select(NaturalDon).order_by(NaturalDon.created_at.desc())
     if status:
         stmt = stmt.where(NaturalDon.status == status)
+    return list(session.scalars(stmt).all())
+
+
+def list_natural_dons_related_to_user(session: Session, user_id: UUID) -> list[NaturalDon]:
+    stmt = (
+        select(NaturalDon)
+        .options(selectinload(NaturalDon.items))
+        .where(
+            or_(
+                NaturalDon.id_user == user_id,
+                NaturalDon.validated_by == user_id,
+                NaturalDon.planned_by == user_id,
+                NaturalDon.received_by == user_id,
+            )
+        )
+        .order_by(NaturalDon.created_at.desc())
+    )
+    return list(session.scalars(stmt).all())
+
+
+def list_collects_by_user(session: Session, user_id: UUID) -> list[Collect]:
+    stmt = (
+        select(Collect)
+        .where(Collect.id_user == user_id)
+        .order_by(Collect.planned_at.desc())
+    )
     return list(session.scalars(stmt).all())
 
 

@@ -1,15 +1,17 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from unittest.mock import patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import jwt
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import JSON, String, create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.types import TypeDecorator
 
 from app.config import settings
 from app.core.dependencies import require_campaign_editor
@@ -17,6 +19,21 @@ from app.database import Base, get_db
 from app.main import app
 from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
 from app.modules.auth.models import RefreshToken, RevokedToken, Role, RoleAssignment, User
+from app.modules.campaigns.models import Campaign, Event
+from app.modules.financial_donations.models import FinancialDon
+from app.modules.natural_donations.models import (
+    Collect,
+    NaturalDon,
+    NaturalDonItem,
+    ObjectType,
+)
+from app.modules.treasury.models import Fund
+from app.modules.volunteers.models import Mission, SignIn
+
+
+class SQLiteArray(TypeDecorator):
+    impl = JSON
+    cache_ok = True
 
 
 @pytest.fixture()
@@ -59,6 +76,62 @@ def auth_client(
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(engine, tables=auth_tables)
+        engine.dispose()
+
+
+@pytest.fixture()
+def user_detail_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
+    monkeypatch.setattr(
+        settings,
+        "jwt_secret_key",
+        "test-jwt-secret-for-tests-at-least-32-bytes",
+    )
+    monkeypatch.setattr(settings, "access_token_expire_minutes", 15)
+    monkeypatch.setattr(settings, "refresh_token_expire_days", 30)
+    monkeypatch.setattr(settings, "auth_cookie_secure", False)
+    monkeypatch.setattr(Mission.__table__.c.required_skills, "type", SQLiteArray())
+    monkeypatch.setattr(Mission.__table__.c.status, "type", String())
+    monkeypatch.setattr(Mission.__table__.c.status, "server_default", None)
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    detail_tables = [
+        User.__table__,
+        Role.__table__,
+        RoleAssignment.__table__,
+        RevokedToken.__table__,
+        RefreshToken.__table__,
+        Campaign.__table__,
+        Event.__table__,
+        FinancialDon.__table__,
+        Collect.__table__,
+        NaturalDon.__table__,
+        NaturalDonItem.__table__,
+        ObjectType.__table__,
+        Fund.__table__,
+        Mission.__table__,
+        SignIn.__table__,
+    ]
+    Base.metadata.create_all(engine, tables=detail_tables)
+    test_session = sessionmaker(bind=engine, autoflush=False)
+    monkeypatch.setattr("app.main.SessionLocal", test_session)
+
+    def override_get_db() -> Iterator[Session]:
+        with test_session() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        with TestClient(app) as client:
+            yield client, test_session
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(engine, tables=detail_tables)
         engine.dispose()
 
 
@@ -1026,6 +1099,107 @@ def test_administrator_cannot_revoke_the_last_administrator(auth_client) -> None
     )
 
     assert response.status_code == 409
+
+
+def test_administrator_can_get_user_detail_with_related_records(user_detail_client) -> None:
+    client, test_session = user_detail_client
+    admin_id, admin_token = _register_test_user(client, "detail-admin@example.com")
+    target_id, target_token = _register_test_user(client, "detail-user@example.com")
+    _assign_administrator_role(test_session, admin_id)
+
+    with test_session() as session:
+        volunteer_role = Role(role_name="Volunteer")
+        session.add(volunteer_role)
+        session.flush()
+        session.add(
+            RoleAssignment(
+                id_user=target_id,
+                id_role=volunteer_role.id_role,
+                assignment_type="assigned",
+            )
+        )
+        campaign = Campaign(title="Campaign by target", id_user=target_id)
+        collect = Collect(
+            place="Community center",
+            planned_at=datetime.now(UTC),
+            id_user=target_id,
+        )
+        session.add_all([campaign, collect])
+        session.flush()
+
+        mission = Mission(
+            id_mission=uuid4(),
+            title="Mission by target",
+            required_skills=["organization"],
+            status="Publish",
+            id_collect=collect.id_collect,
+        )
+        session.add(mission)
+        session.add(SignIn(id_user=target_id, id_mission=mission.id_mission))
+        session.add(
+            FinancialDon(
+                amount=Decimal("25.00"),
+                status="Success",
+                id_user=target_id,
+                id_campaign=campaign.id_campaign,
+            )
+        )
+        user_donation = NaturalDon(
+            recovery_mode="Deposit",
+            id_user=target_id,
+            id_campaign=campaign.id_campaign,
+        )
+        actor_donation = NaturalDon(
+            recovery_mode="Collect",
+            id_user=admin_id,
+            validated_by=target_id,
+        )
+        session.add_all([user_donation, actor_donation])
+        session.flush()
+        session.add(
+            NaturalDonItem(
+                id_don_n=user_donation.id_don_n,
+                id_nat=uuid4(),
+                description="Winter coat",
+            )
+        )
+        session.add(
+            Fund(
+                amount=Decimal("12.50"),
+                category="Expense",
+                transaction_at=datetime.now(UTC),
+                id_user=target_id,
+            )
+        )
+        session.commit()
+
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    response = client.get(f"/api/v1/users/{target_id}", headers=headers)
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["id_user"] == str(target_id)
+    assert detail["role_assignments"][0]["role_name"] == "Volunteer"
+    assert len(detail["campaigns"]) == 1
+    assert detail["mission_sign_ins"][0]["mission"]["title"] == "Mission by target"
+    assert len(detail["financial_donations"]) == 1
+    assert len(detail["natural_donations"]) == 2
+    assert any(donation["items"] for donation in detail["natural_donations"])
+    assert len(detail["collections"]) == 1
+    assert len(detail["treasury_operations"]) == 1
+    assert "password_hash" not in detail
+    assert "refresh_tokens" not in detail
+
+    forbidden = client.get(
+        f"/api/v1/users/{target_id}",
+        headers={"Authorization": f"Bearer {target_token}"},
+    )
+    missing = client.get(
+        f"/api/v1/users/{uuid4()}",
+        headers=headers,
+    )
+    assert forbidden.status_code == 403
+    assert missing.status_code == 404
 
 
 # ============================================================

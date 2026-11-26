@@ -120,6 +120,13 @@ Alembic (`alembic upgrade head`) afin de créer la table `refresh_tokens`.
 sans distinction de casse dans le prénom, le nom complet, le nom ou l'email; `active`
 filtre les comptes actifs (`true`) ou inactifs (`false`).
 
+`GET /api/v1/users/{id_user}` renvoie le détail d'un utilisateur et les données métier
+qui lui sont directement liées : historique des rôles, campagnes créées, inscriptions
+aux missions, dons financiers et naturels, collectes et opérations de trésorerie. Pour
+les dons naturels, les articles sont également inclus. Cette route est réservée aux
+administrateurs; les mots de passe hachés et jetons d'authentification ne sont jamais
+renvoyés. Un identifiant inexistant retourne `404`.
+
 `PATCH /api/v1/users/me` permet à l'utilisateur authentifié de modifier un ou plusieurs
 champs parmi `firstname`, `lastname`, `email` et `tel`. Le prénom et le nom doivent
 contenir entre 2 et 100 caractères; l'adresse email doit utiliser le domaine `gmail.com`

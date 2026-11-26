@@ -12,6 +12,15 @@ from pydantic import (
     model_validator,
 )
 
+from app.modules.campaigns.schemas import CampaignOut
+from app.modules.financial_donations.schemas import FinancialDonOut
+from app.modules.natural_donations.schemas import (
+    CollectOut,
+    NaturalDonWithItemsOut,
+)
+from app.modules.treasury.schemas import FundOut
+from app.modules.volunteers.schemas import MySignInResponse
+
 PHONE_RE = re.compile(r"^0[567]\d{8}$")
 ALLOWED_EMAIL_DOMAINS = frozenset({"gmail.com", "example.com"})
 
@@ -178,3 +187,16 @@ class RoleAssignmentResponse(BaseModel):
     role_name: RoleName
     assignment_type: RoleAssignmentStatus
     created_at: datetime
+
+
+class UserDetailOut(UserOut):
+    is_email_enable: bool
+    locked_until: datetime | None
+    updated_at: datetime
+    role_assignments: list[RoleAssignmentResponse] = Field(default_factory=list)
+    campaigns: list[CampaignOut] = Field(default_factory=list)
+    mission_sign_ins: list[MySignInResponse] = Field(default_factory=list)
+    financial_donations: list[FinancialDonOut] = Field(default_factory=list)
+    natural_donations: list[NaturalDonWithItemsOut] = Field(default_factory=list)
+    collections: list[CollectOut] = Field(default_factory=list)
+    treasury_operations: list[FundOut] = Field(default_factory=list)

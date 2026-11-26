@@ -43,6 +43,7 @@ from app.modules.auth.schemas import (
     RoleAssignmentRequest,
     RoleAssignmentResponse,
     RoleName,
+    UserDetailOut,
     UserOut,
     UserProfileUpdate,
 )
@@ -187,6 +188,18 @@ def current_session(
         user=UserOut.model_validate(current_user),
         roles=service.list_active_user_roles(db, current_user.id_user),
     )
+
+
+@users_router.get("/{id_user}", response_model=UserDetailOut)
+def get_user_detail(
+    id_user: UUID,
+    db: DbSession,
+    admin: AdminUser,
+) -> UserDetailOut:
+    try:
+        return service.get_user_detail(db, id_user)
+    except ManagedUserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
 
 @users_router.patch("/me", response_model=UserOut)
