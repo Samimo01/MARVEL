@@ -93,27 +93,7 @@ La création, la modification, la publication, la clôture et la suppression d'u
 requièrent un rôle actif `Collection_Manager` ou `Administrator` dans `role_assignments`.
 Le catalogue public des campagnes reste accessible sans ces rôles.
 
-Le premier administrateur doit être initialisé hors API, avec une opération SQL exécutée
-par un propriétaire de la base (remplacer l'adresse e-mail) :
 
-```sql
-INSERT INTO public.roles (role_name)
-VALUES ('Administrator')
-ON CONFLICT (role_name) DO NOTHING;
-
-INSERT INTO public.role_assignments (assignment_type, id_role, id_user)
-SELECT 'assigned', roles.id_role, users.id_user
-FROM public.roles
-CROSS JOIN public.users
-WHERE roles.role_name = 'Administrator'
-  AND users.email = 'admin@example.com'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.role_assignments
-    WHERE id_role = roles.id_role
-      AND id_user = users.id_user
-  );
-```
 
 ## Connexion
 
