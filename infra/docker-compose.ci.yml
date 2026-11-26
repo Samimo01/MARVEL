@@ -1,0 +1,39 @@
+﻿services:
+  db:
+    image: postgres:16-alpine
+    container_name: marvel-ci-db
+    environment:
+      POSTGRES_DB: marvel_ci
+      POSTGRES_USER: marvel
+      POSTGRES_PASSWORD: marvel_ci_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marvel -d marvel_ci"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - marvel-network
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql+psycopg://marvel:marvel_ci_password@db:5432/marvel_ci?sslmode=disable
+      JWT_SECRET_KEY: ci-only-test-secret-not-for-production
+      CORS_ORIGINS: http://localhost:8080,http://localhost:8081
+      AUTH_COOKIE_SECURE: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5)"
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  uptime-kuma:
+    profiles:
+      - monitoring
