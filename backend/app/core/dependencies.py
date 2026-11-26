@@ -75,6 +75,8 @@ def get_current_user(
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Utilisateur introuvable")
+    if not user.active:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Compte désactivé")
     return user
 
 

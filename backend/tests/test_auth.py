@@ -1101,6 +1101,73 @@ def test_administrator_cannot_revoke_the_last_administrator(auth_client) -> None
     assert response.status_code == 409
 
 
+def test_administrator_can_toggle_non_admin_accounts_only(auth_client) -> None:
+    client, test_session = auth_client
+    admin_id, admin_token = _register_test_user(client, "activation-admin@example.com")
+    target_id, target_token = _register_test_user(client, "activation-target@example.com")
+    protected_admin_id, _ = _register_test_user(client, "protected-admin@example.com")
+    other_user_id, other_user_token = _register_test_user(client, "activation-other@example.com")
+    _assign_administrator_role(test_session, admin_id)
+
+    with test_session() as session:
+        administrator_role = session.scalar(
+            select(Role).where(Role.role_name == "Administrator")
+        )
+        session.add(
+            RoleAssignment(
+                id_user=protected_admin_id,
+                id_role=administrator_role.id_role,
+                assignment_type="assigned",
+            )
+        )
+        session.commit()
+
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    endpoint = f"/api/v1/users/{target_id}/activation"
+    deactivated = client.patch(endpoint, headers=admin_headers, json={"active": False})
+
+    assert deactivated.status_code == 200
+    assert deactivated.json()["active"] is False
+    assert client.get(
+        "/api/v1/users/me",
+        headers={"Authorization": f"Bearer {target_token}"},
+    ).status_code == 401
+
+    with test_session() as session:
+        refresh_tokens = session.scalars(
+            select(RefreshToken).where(RefreshToken.id_user == target_id)
+        ).all()
+        assert refresh_tokens
+        assert all(token.revoked_at is not None for token in refresh_tokens)
+
+    reactivated = client.patch(endpoint, headers=admin_headers, json={"active": True})
+    protected_admin = client.patch(
+        f"/api/v1/users/{protected_admin_id}/activation",
+        headers=admin_headers,
+        json={"active": False},
+    )
+    forbidden = client.patch(
+        f"/api/v1/users/{target_id}/activation",
+        headers={"Authorization": f"Bearer {other_user_token}"},
+        json={"active": False},
+    )
+    missing = client.patch(
+        f"/api/v1/users/{uuid4()}/activation",
+        headers=admin_headers,
+        json={"active": False},
+    )
+
+    assert reactivated.status_code == 200
+    assert reactivated.json()["active"] is True
+    assert protected_admin.status_code == 409
+    assert forbidden.status_code == 403
+    assert missing.status_code == 404
+    with test_session() as session:
+        protected_admin = session.get(User, protected_admin_id)
+        assert protected_admin is not None
+        assert protected_admin.active is True
+
+
 def test_administrator_can_get_user_detail_with_related_records(user_detail_client) -> None:
     client, test_session = user_detail_client
     admin_id, admin_token = _register_test_user(client, "detail-admin@example.com")

@@ -43,11 +43,13 @@ from app.modules.auth.schemas import (
     RoleAssignmentRequest,
     RoleAssignmentResponse,
     RoleName,
+    UserActivationUpdate,
     UserDetailOut,
     UserOut,
     UserProfileUpdate,
 )
 from app.modules.auth.service import (
+    AdministratorActivationProhibitedError,
     CannotRevokeLastAdministratorError,
     DuplicateAccountError,
     ImageAlreadyExistsError,
@@ -200,6 +202,22 @@ def get_user_detail(
         return service.get_user_detail(db, id_user)
     except ManagedUserNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@users_router.patch("/{id_user}/activation", response_model=UserOut)
+def update_user_activation(
+    id_user: UUID,
+    payload: UserActivationUpdate,
+    db: DbSession,
+    admin: AdminUser,
+) -> UserOut:
+    try:
+        user = service.update_user_activation(db, id_user, payload.active)
+    except ManagedUserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except AdministratorActivationProhibitedError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return UserOut.model_validate(user)
 
 
 @users_router.patch("/me", response_model=UserOut)

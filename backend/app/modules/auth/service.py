@@ -70,6 +70,10 @@ class CannotRevokeLastAdministratorError(ValueError):
     pass
 
 
+class AdministratorActivationProhibitedError(ValueError):
+    pass
+
+
 def _hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
@@ -315,6 +319,33 @@ def list_users(
         limit=limit,
         offset=offset,
     )
+
+
+def update_user_activation(session: Session, user_id: UUID, active: bool) -> User:
+    user = repository.get_user_by_id(session, user_id)
+    if user is None:
+        raise ManagedUserNotFoundError(f"Utilisateur {user_id} introuvable.")
+    if _is_administrator(session, user_id):
+        raise AdministratorActivationProhibitedError(
+            "Le statut d'un compte ayant le rôle Administrator ne peut pas être modifié."
+        )
+
+    user.active = active
+    user.updated_at = datetime.now(UTC)
+    if not active:
+        session.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.id_user == user_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=user.updated_at)
+            .execution_options(synchronize_session=False)
+        )
+
+    session.commit()
+    session.refresh(user)
+    return user
 
 
 def get_user_detail(session: Session, user_id: UUID) -> UserDetailOut:

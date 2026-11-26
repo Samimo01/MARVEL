@@ -127,6 +127,10 @@ class UserProfileUpdate(BaseModel):
         return self
 
 
+class UserActivationUpdate(BaseModel):
+    active: bool
+
+
 class PasswordChangeRequest(BaseModel):
     current_password: SecretStr = Field(min_length=1)
     new_password: SecretStr = Field(min_length=8, max_length=128)

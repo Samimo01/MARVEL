@@ -127,6 +127,12 @@ les dons naturels, les articles sont également inclus. Cette route est réserv�
 administrateurs; les mots de passe hachés et jetons d'authentification ne sont jamais
 renvoyés. Un identifiant inexistant retourne `404`.
 
+`PATCH /api/v1/users/{id_user}/activation` permet à un administrateur d'activer ou de
+désactiver un compte avec `{"active": true}` ou `{"active": false}`. Un compte ayant le
+rôle `Administrator` ne peut pas être modifié par cette route (`409 Conflict`). La
+désactivation bloque l'authentification et révoque les refresh tokens en cours. Un
+utilisateur inexistant retourne `404`.
+
 `PATCH /api/v1/users/me` permet à l'utilisateur authentifié de modifier un ou plusieurs
 champs parmi `firstname`, `lastname`, `email` et `tel`. Le prénom et le nom doivent
 contenir entre 2 et 100 caractères; l'adresse email doit utiliser le domaine `gmail.com`
