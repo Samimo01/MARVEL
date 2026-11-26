@@ -24,6 +24,7 @@ from app.modules.natural_donations.router import (
 from app.modules.natural_donations.router import (
     router as natural_donations_router,
 )
+from app.modules.notifications.router import router as notifications_router
 from app.modules.receipts.router import router as receipts_router
 from app.modules.stock.router import router as stock_router
 from app.modules.treasury.router import router as treasury_router
@@ -49,6 +50,7 @@ for module_router in (
     distributions_router,
     treasury_router,
     volunteers_router,
+    notifications_router,
     dashboard_router,
     users_router,
 ):
