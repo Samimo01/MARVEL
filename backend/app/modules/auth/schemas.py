@@ -118,6 +118,18 @@ class UserProfileUpdate(BaseModel):
         return self
 
 
+class PasswordChangeRequest(BaseModel):
+    current_password: SecretStr = Field(min_length=1)
+    new_password: SecretStr = Field(min_length=8, max_length=128)
+    confirm_new_password: SecretStr = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_new_password_confirmation(self) -> "PasswordChangeRequest":
+        if self.new_password.get_secret_value() != self.confirm_new_password.get_secret_value():
+            raise ValueError("La confirmation du nouveau mot de passe ne correspond pas.")
+        return self
+
+
 class LogoutResponse(BaseModel):
     message: str
 

@@ -124,6 +124,14 @@ fourni, doit contenir 10 chiffres et commencer par `05`, `06` ou `07`. Le télé
 un corps vide ou invalide retourne `422`. La même restriction de domaine s'applique à
 l'inscription.
 
+## Modification du mot de passe
+
+`PATCH /api/v1/users/me/password` exige le mot de passe actuel, un nouveau mot de passe
+et sa confirmation. Le mot de passe actuel doit être correct; le nouveau doit contenir
+entre 8 et 128 caractères et correspondre à sa confirmation. Le nouveau mot de passe est
+haché avant d'être enregistré. Une erreur sur le mot de passe actuel retourne `400`;
+une requête invalide retourne `422`.
+
 ## Base de données (Alembic)
 
 ```powershell

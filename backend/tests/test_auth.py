@@ -565,6 +565,138 @@ def test_profile_update_rejects_invalid_fields(auth_client, payload) -> None:
     assert response.status_code == 422
 
 
+def test_password_change_verifies_current_password_and_saves_new_password(auth_client) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "password-change@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.patch(
+        "/api/v1/users/me/password",
+        json={
+            "current_password": "a-very-strong-password",
+            "new_password": "a-different-strong-password",
+            "confirm_new_password": "a-different-strong-password",
+        },
+        headers={"Origin": "http://localhost:5173"},
+    )
+    old_password_login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "password-change@example.com",
+            "password": "a-very-strong-password",
+        },
+    )
+    new_password_login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "password-change@example.com",
+            "password": "a-different-strong-password",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "Mot de passe modifié avec succès."}
+    assert old_password_login.status_code == 401
+    assert new_password_login.status_code == 200
+
+
+def test_password_change_rejects_incorrect_current_password(auth_client) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "wrong-current-password@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.patch(
+        "/api/v1/users/me/password",
+        json={
+            "current_password": "incorrect-current-password",
+            "new_password": "a-different-strong-password",
+            "confirm_new_password": "a-different-strong-password",
+        },
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Le mot de passe actuel est incorrect."
+
+
+def test_password_change_requires_a_trusted_origin(auth_client) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "password-origin@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.patch(
+        "/api/v1/users/me/password",
+        json={
+            "current_password": "a-very-strong-password",
+            "new_password": "a-different-strong-password",
+            "confirm_new_password": "a-different-strong-password",
+        },
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "new_password,confirmation",
+    [
+        ("short", "short"),
+        ("a-different-strong-password", "another-strong-password"),
+    ],
+)
+def test_password_change_rejects_weak_or_unconfirmed_password(
+    auth_client,
+    new_password: str,
+    confirmation: str,
+) -> None:
+    client, _ = auth_client
+    client.post(
+        "/api/v1/auth/register",
+        data={
+            "firstname": "Ada",
+            "lastname": "Lovelace",
+            "email": "invalid-password-change@example.com",
+            "password": "a-very-strong-password",
+            "tel": "0612345678",
+        },
+    )
+
+    response = client.patch(
+        "/api/v1/users/me/password",
+        json={
+            "current_password": "a-very-strong-password",
+            "new_password": new_password,
+            "confirm_new_password": confirmation,
+        },
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_cookie_logout_requires_a_trusted_origin_and_clears_the_cookie(auth_client) -> None:
     client, _ = auth_client
     client.post(

@@ -22,6 +22,7 @@ from app.modules.auth import repository
 from app.modules.auth.models import RefreshToken, RevokedToken, Role, RoleAssignment, User
 from app.modules.auth.schemas import (
     LoginRequest,
+    PasswordChangeRequest,
     RegistrationRequest,
     RoleAssignmentRequest,
     RoleAssignmentResponse,
@@ -36,6 +37,10 @@ class DuplicateAccountError(ValueError):
 
 
 class InvalidCredentialsError(ValueError):
+    pass
+
+
+class IncorrectCurrentPasswordError(ValueError):
     pass
 
 
@@ -286,6 +291,23 @@ def update_user_profile(
 
     session.refresh(user)
     return user
+
+
+def change_user_password(
+    session: Session,
+    *,
+    user: User,
+    payload: PasswordChangeRequest,
+) -> None:
+    if not verify_password(
+        payload.current_password.get_secret_value(),
+        user.password_hash,
+    ):
+        raise IncorrectCurrentPasswordError("Le mot de passe actuel est incorrect.")
+
+    user.password_hash = hash_password(payload.new_password.get_secret_value())
+    user.updated_at = datetime.now(UTC)
+    session.commit()
 
 
 def list_user_role_assignments(session: Session, user_id: UUID) -> list[RoleAssignmentResponse]:
