@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { config } from '@/app/config'
+import { fetchWithSessionRefresh } from '@/app/api-client'
 
 const backofficeRoles = new Set([
   'Collection_Manager',
@@ -31,7 +32,7 @@ export default function BackofficeGuard({ children }: BackofficeGuardProps) {
 
       try {
         const apiUrl = config.apiUrl.replace(/\/+$/, '')
-        const response = await fetch(`${apiUrl}/api/v1/users/me`, {
+        const response = await fetchWithSessionRefresh(`${apiUrl}/api/v1/users/me`, {
           credentials: 'include',
           headers: { Accept: 'application/json' },
           signal: controller.signal,

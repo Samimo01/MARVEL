@@ -1,4 +1,5 @@
 import { config } from "@/app/config";
+import { fetchWithSessionRefresh } from "@/app/api-client";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -49,7 +50,7 @@ export default function UserDropdown() {
     setLogoutError("");
     try {
       const apiUrl = config.apiUrl.replace(/\/+$/, "");
-      const response = await fetch(`${apiUrl}/api/v1/auth/logout`, {
+      const response = await fetchWithSessionRefresh(`${apiUrl}/api/v1/auth/logout`, {
         method: "POST",
         credentials: "include",
         headers: { Accept: "application/json" },
