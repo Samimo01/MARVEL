@@ -1,0 +1,42 @@
+version: 2
+
+updates:
+  # Backend Python
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+
+  # Frontend public
+  - package-ecosystem: "npm"
+    directory: "/frontend-public"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      frontend-public-dependencies:
+        patterns:
+          - "*"
+
+  # Frontend admin
+  - package-ecosystem: "npm"
+    directory: "/frontend-admin"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      frontend-admin-dependencies:
+        patterns:
+          - "*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
