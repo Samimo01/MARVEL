@@ -1425,40 +1425,82 @@ def test_aut09_rejects_non_image(auth_client) -> None:
 
 @patch("app.modules.auth.service.convert_image_to_webp")
 @patch("app.modules.auth.service.supabase_admin")
-def test_aut09_user_image_route_uses_auth_prefix(
+def test_aut09_user_can_add_first_image_after_registration(
     mock_supabase,
     mock_convert,
     auth_client,
 ) -> None:
     client, _ = auth_client
-    mock_convert.return_value = b"fake_webp"
-    mock_supabase.storage.from_().get_public_url.return_value = (
-        "https://mock.supabase.co/storage/v1/object/public/users/avatar.webp"
-    )
-
-    registration = client.post(
+    response = client.post(
         "/api/v1/auth/register",
         data={
             "firstname": "Jane",
             "lastname": "Doe",
-            "email": "jane-image@example.com",
+            "email": "jane-first-image@example.com",
             "password": "a-very-strong-password",
             "tel": "0612345678",
         },
     )
-    user_id = registration.json()["id_user"]
+    user_id = UUID(response.json()["id_user"])
+    token = response.cookies.get(ACCESS_TOKEN_COOKIE)
+    assert token
 
-    response = client.post(
+    mock_convert.return_value = b"fake_webp"
+    image_url = "https://mock.supabase.co/storage/v1/object/public/users/avatar.webp"
+    mock_supabase.storage.from_().get_public_url.return_value = image_url
+
+    uploaded = client.post(
         f"/api/v1/auth/{user_id}/image",
         files={"image": ("avatar.png", b"fake_png", "image/png")},
+        headers={"Authorization": f"Bearer {token}"},
     )
-    users_route_response = client.post(
-        f"/api/v1/users/{user_id}/image",
+
+    assert uploaded.status_code == 200
+    assert uploaded.json()["image_url"] == image_url
+
+
+def test_aut09_rejects_adding_image_to_another_user(auth_client) -> None:
+    client, test_session = auth_client
+    _, owner_token = _register_test_user(client, "image-owner@example.com")
+    target_id, _ = _register_test_user(client, "image-target@example.com")
+
+    response = client.post(
+        f"/api/v1/auth/{target_id}/image",
         files={"image": ("avatar.png", b"fake_png", "image/png")},
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+
+    assert response.status_code == 403
+    with test_session() as session:
+        target = session.get(User, target_id)
+        assert target is not None
+        assert target.image_url is None
+
+
+@patch("app.modules.auth.service.convert_image_to_webp")
+@patch("app.modules.auth.service.supabase_admin")
+def test_aut09_administrator_can_add_first_image_to_another_user(
+    mock_supabase,
+    mock_convert,
+    auth_client,
+) -> None:
+    client, test_session = auth_client
+    admin_id, admin_token = _register_test_user(client, "image-admin@example.com")
+    target_id, _ = _register_test_user(client, "image-admin-target@example.com")
+    _assign_administrator_role(test_session, admin_id)
+
+    mock_convert.return_value = b"fake_webp"
+    image_url = "https://mock.supabase.co/storage/v1/object/public/users/admin-avatar.webp"
+    mock_supabase.storage.from_().get_public_url.return_value = image_url
+
+    response = client.post(
+        f"/api/v1/auth/{target_id}/image",
+        files={"image": ("avatar.png", b"fake_png", "image/png")},
+        headers={"Authorization": f"Bearer {admin_token}"},
     )
 
     assert response.status_code == 200
-    assert users_route_response.status_code == 405
+    assert response.json()["image_url"] == image_url
 
 
 @patch("app.modules.auth.service.convert_image_to_webp")

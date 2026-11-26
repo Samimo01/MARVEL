@@ -619,24 +619,32 @@ def _is_administrator(session: Session, user_id: UUID) -> bool:
 
 
 # ============================================================
-# AUT-09 : Upload public (pendant l'inscription)
+# AUT-09 : Ajout d'une première photo (self ou admin)
 # ============================================================
 def upload_user_image(
     session: Session,
     *,
+    current_user: User,
     id_user: UUID,
     image_bytes: bytes,
 ) -> User:
-    """AUT-09 : Upload public de la photo d'un utilisateur (avant connexion)."""
+    """Ajoute une première photo au compte de l'utilisateur ou d'un admin."""
     user = repository.get_user_by_id(session, id_user)
     if user is None:
         raise UserNotFoundError(f"Utilisateur {id_user} introuvable.")
 
+    is_self = current_user.id_user == user.id_user
+    is_admin = _is_administrator(session, current_user.id_user)
+    if not is_self and not is_admin:
+        raise UnauthorizedImageActionError(
+            "Vous ne pouvez ajouter une photo qu'à votre propre compte."
+        )
     if user.image_url:
-        raise ImageAlreadyExistsError("Une image existe déjà. Utilisez PATCH /users/{id}/image.")
+        raise ImageAlreadyExistsError(
+            "Une image existe déjà. Utilisez PATCH /users/{id}/image."
+        )
 
-    url = _upload_user_image(id_user, image_bytes, replace=False)
-    user.image_url = url
+    user.image_url = _upload_user_image(id_user, image_bytes, replace=False)
     session.commit()
     session.refresh(user)
     return user

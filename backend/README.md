@@ -147,11 +147,12 @@ l'inscription.
 
 ## Photo de profil
 
-`POST /api/v1/auth/{id_user}/image` permet d'ajouter une première photo si le compte
-n'en possède pas déjà une. Pour remplacer la photo existante, utiliser
-`PATCH /api/v1/users/{id_user}/image`; l'utilisateur peut modifier sa propre photo, et
-un administrateur peut modifier celle d'un autre utilisateur. Lors de l'inscription,
-une photo facultative peut aussi être envoyée directement avec `POST /api/v1/auth/register`.
+L'inscription accepte une photo facultative dans `POST /api/v1/auth/register`. Après
+l'inscription, `POST /api/v1/auth/{id_user}/image` permet à l'utilisateur connecté
+d'ajouter une première photo à son propre compte. Un administrateur peut aussi l'ajouter
+au compte d'un autre utilisateur. Si une photo existe déjà, l'endpoint retourne `409`;
+pour la remplacer, utiliser `PATCH /api/v1/users/{id_user}/image`, accessible à l'utilisateur
+pour son compte ou à un administrateur pour un autre compte.
 
 ## Modification du mot de passe
 

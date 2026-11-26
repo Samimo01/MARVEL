@@ -317,8 +317,6 @@ async def register(
         user, tokens = service.register_user(db, payload, image_bytes=image_bytes)
     except DuplicateAccountError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    except ImageAlreadyExistsError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
     set_access_token_cookie(response, tokens.access_token, persistent=tokens.persistent)
     set_refresh_token_cookie(response, tokens.refresh_token, persistent=tokens.persistent)
@@ -328,6 +326,40 @@ async def register(
         nickname=user.nickname,
         image_url=user.image_url,
     )
+
+
+@router.post("/{id_user}/image", response_model=UserOut)
+async def aut09_upload_user_image(
+    id_user: UUID,
+    image: Annotated[
+        UploadFile,
+        File(..., description="Photo de profil"),
+    ],
+    db: DbSession,
+    current_user: CurrentUser,
+) -> UserOut:
+    """AUT-09 : Ajoute une première photo au compte."""
+    if not (image.content_type or "").startswith("image/"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier fourni n'est pas une image.",
+        )
+
+    image_bytes = await image.read()
+    try:
+        user = service.upload_user_image(
+            db,
+            current_user=current_user,
+            id_user=id_user,
+            image_bytes=image_bytes,
+        )
+        return UserOut.model_validate(user)
+    except UserNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ImageAlreadyExistsError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except UnauthorizedImageActionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
 
 
 @admin_router.get("/roles", response_model=list[RoleName])
@@ -371,31 +403,6 @@ def assign_role(
     except ManagedUserNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except CannotRevokeLastAdministratorError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-
-
-@router.post("/{id_user}/image", response_model=UserOut)
-async def aut09_upload_user_image(
-    id_user: UUID,
-    image: Annotated[UploadFile, File(..., description="Photo de profil")],
-    db: DbSession,
-) -> UserOut:
-    if not (image.content_type or "").startswith("image/"):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            "Le fichier fourni n'est pas une image.",
-        )
-    image_bytes = await image.read()
-    try:
-        user = service.upload_user_image(
-            db,
-            id_user=id_user,
-            image_bytes=image_bytes,
-        )
-        return UserOut.model_validate(user)
-    except UserNotFoundError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
-    except ImageAlreadyExistsError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
