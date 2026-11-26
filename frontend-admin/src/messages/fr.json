@@ -15,7 +15,12 @@
     "groups": {
       "menu": "Menu",
       "support": "Assistance",
-      "others": "Autres"
+      "others": "Autres",
+      "collection": "Collecte",
+      "resources": "Gestion des ressources",
+      "finance": "Finances",
+      "administration": "Administration",
+      "account": "Compte"
     },
     "badges": {
       "new": "nouveau",
@@ -23,7 +28,23 @@
     },
     "items": {
       "dashboard": "Tableau de bord",
-      "userProfile": "Profil utilisateur"
+      "userProfile": "Profil utilisateur",
+      "collection": "Collecte",
+      "resources": "Gestion des ressources",
+      "finance": "Finances",
+      "administration": "Administration",
+      "account": "Compte",
+      "campaigns": "Campagnes",
+      "financialDonations": "Dons financiers",
+      "naturalDonations": "Dons en nature",
+      "collects": "Collectes",
+      "missions": "Missions",
+      "stock": "Stock",
+      "beneficiaries": "Bénéficiaires",
+      "distributions": "Distributions",
+      "treasury": "Trésorerie",
+      "receipts": "Reçus",
+      "users": "Utilisateurs et rôles"
     },
     "widget": {
       "title": "Guide d'utilisation",
