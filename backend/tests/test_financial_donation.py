@@ -12,7 +12,7 @@ from app.config import settings
 from app.database import Base, get_db
 from app.main import app
 from app.modules.auth.cookies import ACCESS_TOKEN_COOKIE
-from app.modules.auth.models import RevokedToken, Role, RoleAssignment, User
+from app.modules.auth.models import RefreshToken, RevokedToken, Role, RoleAssignment, User
 from app.modules.campaigns.models import Campaign
 from app.modules.financial_donations.models import FinancialDon
 
@@ -39,6 +39,7 @@ def donations_client(
         Role.__table__,
         RoleAssignment.__table__,
         RevokedToken.__table__,
+        RefreshToken.__table__,
         Campaign.__table__,
         FinancialDon.__table__,
     ]
@@ -177,6 +178,7 @@ def test_get_donation_detail_and_receipt(donations_client) -> None:
     user_headers = {"Authorization": f"Bearer {user_token}"}
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
+    # 1. Créer un don anonyme (statut Pending)
     don = client.post(
         "/api/v1/dons/financiers",
         json={
@@ -188,24 +190,35 @@ def test_get_donation_detail_and_receipt(donations_client) -> None:
     ).json()
     don_id = don["id_don_f"]
 
+    # 2. Détail du don (DON-05)
     detail = client.get(f"/api/v1/dons/{don_id}", headers=user_headers)
     assert detail.status_code == 200
     assert detail.json()["is_anonymous"] is True
+    assert detail.json()["status"] == "Pending"
 
-    receipt_fail = client.post(f"/api/v1/dons/{don_id}/receipt", headers=admin_headers)
+    # 3. Receipt AVANT paiement -> 400 (DON-06 refuse les non-Success)
+    receipt_fail = client.get(f"/api/v1/dons/{don_id}/receipt", headers=user_headers)
     assert receipt_fail.status_code == 400
 
+    # 4. Payer + confirmer
     client.post(f"/api/v1/dons/financiers/{don_id}/pay", headers=user_headers)
     client.get(
         f"/api/v1/dons/financiers/{don_id}/payment-status",
         headers=user_headers,
     )
 
-    receipt_ok = client.post(f"/api/v1/dons/{don_id}/receipt", headers=admin_headers)
+    # 5. Receipt APRÈS paiement -> 200 + PDF valide (généré en mémoire)
+    receipt_ok = client.get(f"/api/v1/dons/{don_id}/receipt", headers=user_headers)
     assert receipt_ok.status_code == 200
-    assert "mock-storage.com" in receipt_ok.json()["receipt_url"]
+    assert receipt_ok.headers["content-type"].startswith("application/pdf")
+    assert receipt_ok.content[:4] == b"%PDF"
+    assert len(receipt_ok.content) > 0
+    assert receipt_ok.headers.get("cache-control") == "no-store"
 
-
+    # 6. Accessible aussi par l'admin (CurrentUser)
+    receipt_admin = client.get(f"/api/v1/dons/{don_id}/receipt", headers=admin_headers)
+    assert receipt_admin.status_code == 200
+    assert receipt_admin.content[:4] == b"%PDF"
 # ============================================================
 # NOUVEAUX TESTS (DON-04, DON-07, DON-09)
 # ============================================================

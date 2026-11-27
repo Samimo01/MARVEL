@@ -22,6 +22,7 @@ campaign_status_type = ENUM(
     "Draft",
     "In_progress",
     "closed",
+    "Invisible",
     name="campaign_status",
     create_type=False,
 )

@@ -183,4 +183,7 @@ class NaturalDonItem(Base):
         back_populates="items",
     )
 
-    id_stock: Mapped[str | None] = mapped_column(String)
+    id_stock: Mapped[UUID | None] = mapped_column(
+    Uuid(as_uuid=True),
+    nullable=True,
+    )

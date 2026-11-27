@@ -13,6 +13,7 @@ from app.core.dependencies import (
     require_natural_donation_staff,
     require_stock_manager_or_admin,
 )
+from app.core.image_utils import InvalidImageError
 from app.database import get_db
 from app.modules.auth.models import User
 from app.modules.natural_donations import service as don_service
@@ -161,6 +162,8 @@ async def nat03_upload_item_image(
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except ItemNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except InvalidImageError as exc:                          # ← AJOUT
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     except InvalidStatusTransitionError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
@@ -197,6 +200,8 @@ async def nat19_replace_item_image(
         )
     except NaturalDonNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except InvalidImageError as exc:                          # ← AJOUT
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     except ItemNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 

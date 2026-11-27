@@ -79,7 +79,7 @@ En production, mettre ici les domaines réels.
 ## Création de compte
 
 `POST /api/v1/auth/register` crée un compte à partir du prénom, du nom, de l'e-mail,
-du mot de passe et du téléphone, puis renvoie un token d'accès JWT de type Bearer.
+du mot de passe et du téléphone, puis ouvre une session avec des cookies `HttpOnly`.
 La clé `JWT_SECRET_KEY` doit contenir au moins 32 octets et être définie dans `.env`
 (génération : `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
 Aucun rôle n'est attribué à l'inscription. Un administrateur peut consulter les rôles
@@ -87,41 +87,80 @@ disponibles avec `GET /api/v1/admin/roles`, voir les affectations d'un utilisate
 `GET /api/v1/admin/users/{id_user}/roles` et modifier une affectation avec
 `POST /api/v1/admin/users/{id_user}/roles/{role_name}`, en envoyant
 `{"assignment_type":"assigned"}` ou `{"assignment_type":"revoked"}`. Ces routes exigent
-un JWT d'administrateur. Le dernier administrateur actif ne peut pas se révoquer.
+un JWT d'administrateur. `DELETE /api/v1/users/{user_id}/roles/{role_id}` révoque un rôle
+par son identifiant de catalogue : l'opération ajoute une ligne `revoked` dans
+`role_assignments`, avec l'utilisateur, le rôle et la date dans `created_at`; l'historique
+existant n'est pas supprimé. Le dernier administrateur actif ne peut pas se révoquer.
 La création ne dépend pas de la configuration d'un service d'e-mail.
 La création, la modification, la publication, la clôture et la suppression d'une campagne
 requièrent un rôle actif `Collection_Manager` ou `Administrator` dans `role_assignments`.
 Le catalogue public des campagnes reste accessible sans ces rôles.
 
-Le premier administrateur doit être initialisé hors API, avec une opération SQL exécutée
-par un propriétaire de la base (remplacer l'adresse e-mail) :
 
-```sql
-INSERT INTO public.roles (role_name)
-VALUES ('Administrator')
-ON CONFLICT (role_name) DO NOTHING;
-
-INSERT INTO public.role_assignments (assignment_type, id_role, id_user)
-SELECT 'assigned', roles.id_role, users.id_user
-FROM public.roles
-CROSS JOIN public.users
-WHERE roles.role_name = 'Administrator'
-  AND users.email = 'admin@example.com'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.role_assignments
-    WHERE id_role = roles.id_role
-      AND id_user = users.id_user
-  );
-```
 
 ## Connexion
 
-`POST /api/v1/auth/login` accepte une adresse e-mail et un mot de passe, puis renvoie
-un JWT de type Bearer si les identifiants sont valides. Le token expire après 30 jours
-par défaut (`ACCESS_TOKEN_EXPIRE_MINUTES=43200`). Le frontend peut le conserver dans
-`localStorage` et l'envoyer dans l'en-tête `Authorization: Bearer <token>` pour ses
-requêtes authentifiées.
+`POST /api/v1/auth/login` accepte une adresse e-mail et un mot de passe. Les jetons ne
+sont pas renvoyés dans le JSON ni stockés dans `localStorage` : ils sont transmis dans
+des cookies `HttpOnly`, `SameSite=Lax`.
+
+- Le jeton d'accès JWT expire après 15 minutes (`ACCESS_TOKEN_EXPIRE_MINUTES=15`).
+- Le refresh token opaque expire après 30 jours d'inactivité
+  (`REFRESH_TOKEN_EXPIRE_DAYS=30`). Avec « Rester connecté », le cookie est persistant;
+  sinon, c'est un cookie de session navigateur.
+- `POST /api/v1/auth/refresh` renouvelle les cookies et fait tourner le refresh token.
+  Seul le hash SHA-256 du refresh token est stocké en base.
+- La réutilisation d'un refresh token déjà renouvelé révoque toute sa famille de session.
+  `POST /api/v1/auth/logout` révoque les jetons de la session courante.
+
+Pour la production, configurer `AUTH_COOKIE_SECURE=true` et exécuter les migrations
+Alembic (`alembic upgrade head`) afin de créer la table `refresh_tokens`.
+
+## Modification du profil
+
+`GET /api/v1/users` est réservé aux administrateurs et renvoie une liste paginée avec
+`limit` (1–100, par défaut 50) et `offset` (0 par défaut). Le paramètre `search` recherche
+sans distinction de casse dans le prénom, le nom complet, le nom ou l'email; `active`
+filtre les comptes actifs (`true`) ou inactifs (`false`).
+
+`GET /api/v1/users/{id_user}` renvoie le détail d'un utilisateur et les données métier
+qui lui sont directement liées : historique des rôles, campagnes créées, inscriptions
+aux missions, dons financiers et naturels, collectes et opérations de trésorerie. Pour
+les dons naturels, les articles sont également inclus. Cette route est réservée aux
+administrateurs; les mots de passe hachés et jetons d'authentification ne sont jamais
+renvoyés. Un identifiant inexistant retourne `404`.
+
+`PATCH /api/v1/users/{id_user}/activation` permet à un administrateur d'activer ou de
+désactiver un compte avec `{"active": true}` ou `{"active": false}`. Un compte ayant le
+rôle `Administrator` ne peut pas être modifié par cette route (`409 Conflict`). La
+désactivation bloque l'authentification et révoque les refresh tokens en cours. Un
+utilisateur inexistant retourne `404`.
+
+`PATCH /api/v1/users/me` permet à l'utilisateur authentifié de modifier un ou plusieurs
+champs parmi `firstname`, `lastname`, `email` et `tel`. Le prénom et le nom doivent
+contenir entre 2 et 100 caractères; l'adresse email doit utiliser le domaine `gmail.com`
+ou `example.com`, est normalisée en minuscules et doit être unique; le téléphone, s'il est
+fourni, doit contenir 10 chiffres et commencer par `05`, `06` ou `07`. Le téléphone peut
+être envoyé à `null` pour être effacé. Une adresse déjà utilisée retourne `409 Conflict`;
+un corps vide ou invalide retourne `422`. La même restriction de domaine s'applique à
+l'inscription.
+
+## Photo de profil
+
+L'inscription accepte une photo facultative dans `POST /api/v1/auth/register`. Après
+l'inscription, `POST /api/v1/auth/{id_user}/image` permet à l'utilisateur connecté
+d'ajouter une première photo à son propre compte. Un administrateur peut aussi l'ajouter
+au compte d'un autre utilisateur. Si une photo existe déjà, l'endpoint retourne `409`;
+pour la remplacer, utiliser `PATCH /api/v1/users/{id_user}/image`, accessible à l'utilisateur
+pour son compte ou à un administrateur pour un autre compte.
+
+## Modification du mot de passe
+
+`PATCH /api/v1/users/me/password` exige le mot de passe actuel, un nouveau mot de passe
+et sa confirmation. Le mot de passe actuel doit être correct; le nouveau doit contenir
+entre 8 et 128 caractères et correspondre à sa confirmation. Le nouveau mot de passe est
+haché avant d'être enregistré. Une erreur sur le mot de passe actuel retourne `400`;
+une requête invalide retourne `422`.
 
 ## Base de données (Alembic)
 

@@ -103,3 +103,27 @@ class RevokedToken(Base):
         nullable=False,
         index=True,
     )
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    family_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False, index=True)
+    id_user: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id_user", ondelete="CASCADE"),
+        nullable=False,
+    )
+    persistent: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
