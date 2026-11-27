@@ -1,41 +1,122 @@
-import { config } from "@/app/config";
+import {
+  PageHeading,
+  DataPanel,
+  StatusPill,
+} from "@/components/shared/feature-page";
 import { PageMeta } from "@/components/shared/page-meta";
-import { CheckCircleIcon } from "@/icons";
-
+import { useSession } from "@/app/auth/session-context";
+import { ROLE } from "@/app/auth/permissions";
+import { useDashboard } from "@/features/dashboard/hooks/use-dashboard";
+import DonationChart from "@/features/dashboard/components/donation-chart";
+import StatCard from "@/features/dashboard/components/stat-card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export default function DashboardPage() {
+  const { data, loading } = useDashboard();
+  const { roles, user } = useSession();
+  const isTreasurer =
+    roles.includes(ROLE.treasurer) || roles.includes(ROLE.administrator);
+  const isCollection =
+    roles.includes(ROLE.collection) || roles.includes(ROLE.administrator);
+  const overview = data?.overview;
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <PageMeta
-        title="Accueil du backoffice"
-        description="Accueil temporaire du backoffice MARVEL."
+        title="Tableau de bord MARVEL"
+        description="Vue d'ensemble des activités de l'association."
       />
-
-      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
-        <div className="max-w-3xl p-6 lg:p-10">
-          <div className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 dark:bg-green-500/10 dark:text-green-400">
-            <CheckCircleIcon className="size-4" aria-hidden="true" />
-            Accès au backoffice autorisé
-          </div>
-          <p className="mt-6 text-sm font-medium text-brand-600 dark:text-brand-400">
-            Accueil temporaire
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-            Bienvenue dans le backoffice MARVEL
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-400">
-            Votre session a été vérifiée et un rôle de gestion actif a été
-            reconnu. Cette page temporaire vous permet de tester la connexion
-            et la redirection depuis le site vitrine. Les modules de gestion
-            seront intégrés progressivement.
-          </p>
-          <a
-            href={config.publicUrl}
-            className="mt-6 inline-flex min-h-10 items-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
-          >
-            Retourner au site vitrine
-          </a>
+      <PageHeading
+        title={`Bonjour ${user.nickname || user.firstname},`}
+        description="Voici un aperçu de l'activité de votre association."
+      />
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {isTreasurer && (
+          <StatCard
+            label="Dons financiers"
+            value={
+              loading
+                ? "—"
+                : `${(overview?.financialTotal ?? 0).toLocaleString("fr-FR")} DA`
+            }
+            helper={`${overview?.financialDonations ?? 0} dons enregistrés`}
+            icon="↗"
+          />
+        )}
+        {isCollection && (
+          <StatCard
+            label="Dons en nature"
+            value={loading ? "—" : String(overview?.naturalDeclarations ?? 0)}
+            helper="Déclarations reçues"
+            icon="▣"
+          />
+        )}
+        <StatCard
+          label="Campagnes actives"
+          value={loading ? "—" : String(overview?.activeCampaigns ?? 0)}
+          helper="Campagnes en cours"
+          icon="◎"
+        />
+        <StatCard
+          label="Actions à traiter"
+          value={loading ? "—" : String(overview?.pendingActions ?? 0)}
+          helper="Éléments en attente"
+          icon="◷"
+        />
+      </div>
+      <DonationChart
+        financial={data?.financial ?? []}
+        natural={data?.natural ?? []}
+      />
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <DataPanel
+            title="Activité récente"
+            description="Derniers événements de démonstration"
+            rows={
+              (overview?.recentActivities ?? []) as unknown as Record<
+                string,
+                unknown
+              >[]
+            }
+            columns={[
+              {
+                key: "label",
+                label: "Activité",
+                render: (row) => (
+                  <div className="min-w-0">
+                    <p className="break-words font-medium text-gray-800 dark:text-white">
+                      {String(row.label)}
+                    </p>
+                    <p className="mt-1 break-words text-xs text-gray-400">
+                      {String(row.detail)}
+                    </p>
+                  </div>
+                ),
+              },
+              { key: "date", label: "Date" },
+              {
+                key: "status",
+                label: "Statut",
+                render: (row) => <StatusPill value={String(row.status)} />,
+              },
+            ]}
+          />
         </div>
-      </section>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Accès rapide</CardTitle>
+          </CardHeader>
+          <CardContent className="grid min-w-0 gap-3 text-sm text-gray-600 dark:text-gray-300">
+            <p>
+              Utilisez le menu latéral pour accéder aux modules correspondant à
+              vos rôles.
+            </p>
+            <div className="rounded-lg bg-brand-50 p-3 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+              Les statistiques affichées ici sont provisoires : le backend ne
+              fournit pas encore d’API Dashboard agrégée.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

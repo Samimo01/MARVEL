@@ -15,7 +15,12 @@
     "groups": {
       "menu": "Menu",
       "support": "Support",
-      "others": "Others"
+      "others": "Others",
+      "collection": "Collection",
+      "resources": "Resource management",
+      "finance": "Finance",
+      "administration": "Administration",
+      "account": "Account"
     },
     "badges": {
       "new": "new",
@@ -129,7 +134,22 @@
       "variants02": "Variants 02",
       "variants03": "Variants 03",
       "variants04": "Variants 04",
-      "variants05": "Variants 05"
+      "variants05": "Variants 05",
+      "collection": "Collection",
+      "resources": "Resource management",
+      "administration": "Administration",
+      "account": "Account",
+      "campaigns": "Campaigns",
+      "financialDonations": "Financial donations",
+      "naturalDonations": "In-kind donations",
+      "collects": "Collections",
+      "missions": "Missions",
+      "stock": "Stock",
+      "beneficiaries": "Beneficiaries",
+      "distributions": "Distributions",
+      "treasury": "Treasury",
+      "receipts": "Receipts",
+      "users": "Users and roles"
     },
     "widget": {
       "title": "User guide",

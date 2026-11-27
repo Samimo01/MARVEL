@@ -1,5 +1,5 @@
-import { config } from "@/app/config";
-import { fetchWithSessionRefresh } from "@/app/api-client";
+import { useLogout } from "@/features/auth/hooks/use-logout";
+import { useSession } from "@/app/auth/session-context";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -29,41 +29,29 @@ import { Link, useLocation, useNavigate } from "react-router";
 
 export default function UserDropdown() {
   const t = useTranslations("userDropdown");
+  const session = useSession();
+  const displayName =
+    session.user.nickname ||
+    `${session.user.firstname} ${session.user.lastname}`;
   const locale = useLocale() as Locale;
   const navigate = useNavigate();
   const changeLocale = useChangeLocale();
   const { pathname } = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [logoutPending, setLogoutPending] = useState(false);
-  const [logoutError, setLogoutError] = useState("");
+  const { pending: logoutPending, error: logoutError, signOut } = useLogout();
 
   const currentLang = getLanguage(locale);
   const CurrentFlagIcon = currentLang.FlagIcon;
 
   const handleSelectLanguage = (id: Locale) => {
-    changeLocale(id);
-    navigate(pathname, { replace: true });
+    void changeLocale(id);
+    void navigate(pathname, { replace: true });
   };
 
   const handleLogout = async () => {
-    setLogoutPending(true);
-    setLogoutError("");
-    try {
-      const apiUrl = config.apiUrl.replace(/\/+$/, "");
-      const response = await fetchWithSessionRefresh(`${apiUrl}/api/v1/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) {
-        throw new Error(`Impossible de se déconnecter (${response.status}).`);
-      }
-      window.location.replace(
-        `${config.publicUrl.replace(/\/+$/, "")}/auth?mode=login`,
-      );
-    } catch {
-      setLogoutError(t("logoutError"));
-      setLogoutPending(false);
+    const succeeded = await signOut();
+    if (succeeded) {
+      window.location.replace("/login");
     }
   };
 
@@ -71,10 +59,10 @@ export default function UserDropdown() {
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger className="dropdown-toggle flex items-center text-gray-700 dark:text-gray-400">
         <span className="me-3 flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-sm font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-          M
+          {displayName.slice(0, 1).toUpperCase()}
         </span>
 
-        <span className="me-1 block text-sm font-medium">{t("team")}</span>
+        <span className="me-1 block text-sm font-medium">{displayName}</span>
 
         <ChevronDownIcon
           className={cn(
@@ -87,7 +75,10 @@ export default function UserDropdown() {
       <DropdownMenuContent align="end" sideOffset={12} className="w-65 p-3">
         <div className="px-3 py-2">
           <span className="block text-sm font-medium text-gray-700 dark:text-gray-400">
-            {t("team")}
+            {displayName}
+          </span>
+          <span className="mt-1 block text-xs text-gray-400">
+            {session.roles.join(" · ")}
           </span>
         </div>
 

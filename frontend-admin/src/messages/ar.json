@@ -15,7 +15,12 @@
     "groups": {
       "menu": "القائمة",
       "support": "الدعم",
-      "others": "أخرى"
+      "others": "أخرى",
+      "collection": "الجمع",
+      "resources": "إدارة الموارد",
+      "finance": "المالية",
+      "administration": "الإدارة",
+      "account": "الحساب"
     },
     "badges": {
       "new": "جديد",
@@ -129,7 +134,22 @@
       "variants02": "المتغير 02",
       "variants03": "المتغير 03",
       "variants04": "المتغير 04",
-      "variants05": "المتغير 05"
+      "variants05": "المتغير 05",
+      "collection": "الجمع",
+      "resources": "إدارة الموارد",
+      "administration": "الإدارة",
+      "account": "الحساب",
+      "campaigns": "الحملات",
+      "financialDonations": "التبرعات المالية",
+      "naturalDonations": "التبرعات العينية",
+      "collects": "عمليات الجمع",
+      "missions": "المهام",
+      "stock": "المخزون",
+      "beneficiaries": "المستفيدون",
+      "distributions": "التوزيعات",
+      "treasury": "الخزينة",
+      "receipts": "الإيصالات",
+      "users": "المستخدمون والأدوار"
     },
     "widget": {
       "title": "دليل الاستخدام",
