@@ -12,13 +12,17 @@ export function useDashboard() {
   } | null>(null);
   useEffect(() => {
     let active = true;
-    Promise.all([
+    void Promise.all([
       getDashboardOverview(),
       getFinancialDonationTrend(),
       getNaturalDonationBreakdown(),
-    ]).then(([overview, financial, natural]) => {
-      if (active) setData({ overview, financial, natural });
-    });
+    ])
+      .then(([overview, financial, natural]) => {
+        if (active) setData({ overview, financial, natural });
+      })
+      .catch((caught: unknown) => {
+        console.error("Erreur lors du chargement du tableau de bord.", caught);
+      });
     return () => {
       active = false;
     };

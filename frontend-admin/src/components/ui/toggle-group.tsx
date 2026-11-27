@@ -39,15 +39,15 @@ function ToggleGroup({
       data-size={size}
       data-spacing={spacing}
       data-orientation={orientation}
-      style={{
+      style={(state) => ({
         gap:
           spacing !== 0
             ? typeof spacing === "number"
               ? `${spacing * 0.25}rem`
               : spacing
             : undefined,
-        ...style,
-      }}
+        ...(typeof style === "function" ? style(state) : style),
+      })}
       className={cn(
         "group/toggle-group flex w-fit flex-row items-center data-vertical:flex-col data-vertical:items-stretch",
         className,

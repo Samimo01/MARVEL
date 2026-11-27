@@ -6,6 +6,8 @@ import { Link } from "react-router";
 import { cn } from "@/utils";
 import type { Error404Props } from "./types";
 
+const COPYRIGHT_YEAR = new Date().getFullYear();
+
 export default function Error404({
   title = "ERREUR",
   description = "Nous ne trouvons pas la page que vous recherchez.",
@@ -57,7 +59,7 @@ export default function Error404({
       </div>
 
       <p className="absolute inset-s-1/2 bottom-6 -translate-x-1/2 text-center text-sm text-gray-500 rtl:translate-x-1/2 dark:text-gray-400">
-        &copy; {new Date().getFullYear()} - MARVEL
+        &copy; {COPYRIGHT_YEAR} - MARVEL
       </p>
     </div>
   );

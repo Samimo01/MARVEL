@@ -14,7 +14,7 @@ export default function LoginPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const authenticated = await signIn({ email, password, rememberMe });
-    if (authenticated) navigate("/", { replace: true });
+    if (authenticated) void navigate("/", { replace: true });
   };
 
   return (

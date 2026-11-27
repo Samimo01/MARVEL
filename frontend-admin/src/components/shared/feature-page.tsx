@@ -10,6 +10,28 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+function primitiveString(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "bigint") {
+    return String(value);
+  }
+  if (typeof value === "boolean") return value ? "Oui" : "Non";
+  if (value === null || value === undefined) return "—";
+  return null;
+}
+
+function rowKey(row: unknown, index: number): string {
+  const record = row as Record<string, unknown>;
+  const candidate =
+    record.id ??
+    record.id_campaign ??
+    record.id_don_f ??
+    record.id_don_n ??
+    record.id_collect ??
+    record.id_mission;
+  return primitiveString(candidate) ?? String(index);
+}
+
 export type Column<T> = {
   key: keyof T | string;
   label: string;
@@ -98,26 +120,18 @@ export function DataPanel<T extends object>({
             ) : (
               rows.map((row, index) => (
                 <tr
-                  key={String(
-                    (row as Record<string, unknown>).id ??
-                      (row as Record<string, unknown>).id_campaign ??
-                      (row as Record<string, unknown>).id_don_f ??
-                      (row as Record<string, unknown>).id_don_n ??
-                      (row as Record<string, unknown>).id_collect ??
-                      (row as Record<string, unknown>).id_mission ??
-                      index,
-                  )}
+                  key={rowKey(row, index)}
                   className="text-gray-700 dark:text-gray-300"
                 >
                   {columns.map((column) => (
                     <td key={String(column.key)} className="px-5 py-4">
                       {column.render
                         ? column.render(row)
-                        : String(
+                        : primitiveString(
                             (row as Record<string, unknown>)[
                               String(column.key)
-                            ] ?? "—",
-                          )}
+                            ],
+                          ) ?? "—"}
                     </td>
                   ))}
                 </tr>

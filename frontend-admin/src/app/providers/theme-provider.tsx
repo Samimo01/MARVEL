@@ -19,24 +19,20 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeMode, setThemeModeState] = useState<ThemeMode>("light");
-  const [theme, setTheme] = useState<ResolvedTheme>("light");
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  useEffect(() => {
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     const savedMode = localStorage.getItem("theme-mode") as ThemeMode | null;
     const legacySavedTheme = localStorage.getItem(
       "theme",
     ) as ResolvedTheme | null;
-    const initialMode = savedMode || (legacySavedTheme as ThemeMode) || "light";
-
-    setThemeModeState(initialMode);
-    setIsInitialized(true);
-  }, []);
+    return savedMode || (legacySavedTheme as ThemeMode) || "light";
+  });
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() =>
+    window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+  );
+  const theme: ResolvedTheme =
+    themeMode === "auto" ? systemTheme : (themeMode as ResolvedTheme);
 
   useEffect(() => {
-    if (!isInitialized) return;
-
     localStorage.setItem("theme-mode", themeMode);
 
     if (themeMode === "auto") {
@@ -44,32 +40,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       const handleChange = () => {
         const resolved = mediaQuery.matches ? "dark" : "light";
-        setTheme(resolved);
+        setSystemTheme(resolved);
       };
-
-      handleChange();
 
       mediaQuery.addEventListener("change", handleChange);
       return () => {
         mediaQuery.removeEventListener("change", handleChange);
       };
-    } else {
-      setTheme(themeMode as ResolvedTheme);
     }
-  }, [themeMode, isInitialized]);
+  }, [themeMode]);
 
   useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("theme", theme);
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark");
-        document.documentElement.setAttribute("data-color-scheme", "dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-        document.documentElement.setAttribute("data-color-scheme", "light");
-      }
+    localStorage.setItem("theme", theme);
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-color-scheme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute("data-color-scheme", "light");
     }
-  }, [theme, isInitialized]);
+  }, [theme]);
 
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);

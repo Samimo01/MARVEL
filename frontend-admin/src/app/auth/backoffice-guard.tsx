@@ -11,7 +11,6 @@ export default function BackofficeGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setError("");
 
     getCurrentSession(controller.signal)
       .then((current) => {
@@ -53,7 +52,10 @@ export default function BackofficeGuard({ children }: { children: ReactNode }) {
           </p>
           <button
             className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white"
-            onClick={() => setAttempt((value) => value + 1)}
+            onClick={() => {
+              setError("");
+              setAttempt((value) => value + 1);
+            }}
           >
             Réessayer
           </button>

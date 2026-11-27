@@ -45,8 +45,8 @@ export default function UserDropdown() {
   const CurrentFlagIcon = currentLang.FlagIcon;
 
   const handleSelectLanguage = (id: Locale) => {
-    changeLocale(id);
-    navigate(pathname, { replace: true });
+    void changeLocale(id);
+    void navigate(pathname, { replace: true });
   };
 
   const handleLogout = async () => {

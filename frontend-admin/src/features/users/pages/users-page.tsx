@@ -23,7 +23,9 @@ export default function UsersPage() {
   const lookup = async () => {
     try {
       await search(id.trim());
-    } catch {}
+    } catch {
+      // L'erreur est déjà exposée par useUserRoles.
+    }
   };
   const change = async (role: string, type: "assigned" | "revoked") => {
     if (type === "revoked" && !window.confirm(`Révoquer le rôle ${role} ?`))

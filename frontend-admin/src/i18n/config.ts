@@ -14,7 +14,7 @@ const syncDocument = (lng: string) => {
 
 i18n.on("languageChanged", syncDocument);
 
-i18n
+void i18n
   .use(ICU)
   .use(LanguageDetector)
   .use(
