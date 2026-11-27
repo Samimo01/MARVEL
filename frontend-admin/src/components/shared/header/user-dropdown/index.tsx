@@ -1,5 +1,4 @@
 import { useLogout } from "@/features/auth/hooks/use-logout";
-import { config } from "@/app/config";
 import { useSession } from "@/app/auth/session-context";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -52,9 +51,7 @@ export default function UserDropdown() {
   const handleLogout = async () => {
     const succeeded = await signOut();
     if (succeeded) {
-      window.location.replace(
-        `${config.publicUrl.replace(/\/+$/, "")}/auth?mode=login`,
-      );
+      window.location.replace("/login");
     }
   };
 
